@@ -415,17 +415,18 @@ input:focus-visible {
 /* ==========================================================================
    Screen banner
    ========================================================================== */
-.screen {
+.poster {
     position: relative;
-    aspect-ratio: 21 / 9;
-    min-height: 220px;
+    /* Affiche portrait (4:5), centrée : un recadrage paysage couperait le texte */
+    aspect-ratio: 4 / 5;
+    max-width: 560px;
+    margin: 0 auto;
     border-radius: 24px;
     overflow: hidden;
     border: 1px solid var(--color-border);
     background: var(--color-surface-2);
 }
 
-.screen .media-cover { object-position: center 60%; }
 
 /* ==========================================================================
    Concept
@@ -685,8 +686,9 @@ input:focus-visible {
    Booking form (cream panel)
    ========================================================================== */
 .booking {
-    gap: 48px;
-    padding: 48px;
+    gap: 32px 48px;
+    padding: 36px 48px;
+    align-items: start;
     border-radius: 24px;
     background: var(--color-cream);
     color: var(--color-bg);
@@ -804,35 +806,117 @@ input:focus-visible {
 /* ==========================================================================
    Small screens
    ========================================================================== */
+/* Barre d'action collante : mobile uniquement (voir sticky_cta_controller.js) */
+.sticky-cta { display: none; }
+
 @media (max-width: 640px) {
     :root {
         --gutter: 16px;
-        --section-gap: 72px;
+        --section-gap: 56px;
     }
 
-    .guest__body,
-    .venue__info,
-    .booking,
-    .ticket {
-        padding: 32px 24px;
-    }
+    body { font-size: 16px; }
 
-    .guest__media { min-height: 380px; }
+    /* --- En-tête : logos + bouton, la navigation par ancres est masquée --- */
+    .site-header { padding-top: 12px; padding-bottom: 12px; }
+    .brand { gap: 10px; }
+    .brand__podlab { width: 48px; height: 48px; }
+    .brand__bb { height: 36px; }
+    .brand__times { font-size: 18px; }
+    .site-nav { gap: 0; }
+    .site-nav__link { display: none; }
 
+    /* --- Hero --- */
+    .hero { padding-top: 24px; padding-bottom: 48px; }
+    .hero__kicker { font-size: 12px; margin-bottom: 14px; }
+    .hero__intro { margin-top: 18px; font-size: 18px; }
+
+    .facts { margin-top: 28px; grid-template-columns: 1fr; gap: 8px; }
+    .fact { padding: 12px 16px; }
+    .fact__value { font-size: 17px; }
+
+    .countdown { margin-top: 20px; padding: 16px; }
+    .countdown__heading { font-size: 12px; margin-bottom: 10px; }
     .countdown__grid { gap: 8px; }
+    .countdown__unit { padding: 10px 4px; }
+    .countdown__unit .label { margin-top: 6px; font-size: 11px; letter-spacing: 0.06em; }
 
-    .schedule__row {
-        grid-template-columns: 1fr;
-        gap: 6px;
-    }
+    .hero__cta { margin-top: 20px; flex-direction: column; align-items: stretch; gap: 10px; }
+    .hero__cta .btn { width: 100%; padding: 0 20px; font-size: 16px; text-align: center; }
+    .hero__cta-note { text-align: center; font-size: 14px; }
 
+    /* --- Sections --- */
+    .poster { border-radius: 18px; }
+    .lead { font-size: 17px; }
+    .concept { gap: 20px; }
+
+    .guest { border-radius: 20px; }
+    .guest__media { min-height: 300px; }
+    .guest__body { padding: 24px 20px; gap: 16px; }
+    .guest__quote { padding: 16px 18px; font-size: 20px; }
+    .guest__body .btn { width: 100%; }
+
+    .audience { gap: 10px; }
+    .audience__item { display: flex; align-items: baseline; gap: 16px; padding: 16px 18px; font-size: 16px; }
+    .audience__num { margin: 0; font-size: 24px; flex: none; }
+
+    .schedule__row { grid-template-columns: 1fr; gap: 4px; padding: 18px 0; }
+    .schedule__time { font-size: 20px; }
+    .schedule__title { font-size: 18px; }
     .schedule__row--highlight { padding-left: 16px; padding-right: 16px; }
     .schedule__row--highlight .schedule__time { padding-left: 0; }
+
+    .venue { border-radius: 18px; }
+    .venue__info { padding: 24px 20px; }
+    .venue__info .btn { width: 100%; }
+
+    /* L'iframe de billetterie a besoin de toute la largeur */
+    .booking { padding: 20px 12px; gap: 16px; border-radius: 18px; }
+    .booking > :first-child { padding: 0 8px; }
+    .booking__iframe { border-radius: 10px; }
+
+    .partner { padding: 24px 20px; gap: 16px; }
+    .partner__sponsor { height: 72px; }
+
+    .site-footer { padding-top: 40px; padding-bottom: 104px; flex-direction: column; align-items: flex-start; }
+
+    /* --- Contenu allégé sur mobile (doublons ou secondaire) --- */
+    #tarifs,                  /* la billetterie intégrée affiche déjà le billet et le prix */
+    .venue__media,            /* même photo que le bandeau en haut de page */
+    .guest__facts,
+    .guest__more,
+    .audience__cta,
+    .booking__countdown,      /* le décompte est déjà dans le hero */
+    .partner--organizers,     /* logos déjà dans l'en-tête et le pied de page */
+    .site-footer__brand img { display: none; }
+
+    /* --- Barre d'action collante --- */
+    .sticky-cta {
+        position: fixed;
+        /* Même largeur que le contenu de la page : alignée sur les marges (gutter) */
+        left: var(--gutter);
+        right: var(--gutter);
+        bottom: calc(12px + env(safe-area-inset-bottom));
+        z-index: 10;
+        display: block;
+        max-width: var(--container);
+        margin: 0 auto;
+        transform: translateY(calc(100% + 24px));
+        transition: transform 0.25s ease;
+    }
+    .sticky-cta.is-visible { transform: translateY(0); }
+    .sticky-cta .btn {
+        width: 100%;
+        min-height: 52px;
+        font-size: 16px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .btn { transition: none; }
+    .btn,
+    .sticky-cta { transition: none; }
 }
 
 /* ==========================================================================
