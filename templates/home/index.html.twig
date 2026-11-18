@@ -1,0 +1,292 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Podlab au Cinéma · Majestic Marina{% endblock %}
+
+{% block meta %}
+    <meta name="description" content="Avant-première du podcast Podlab avec l'humoriste Edgar-Yves, sur grand écran au Majestic Marina, Sofitel Marina Hotel, Cotonou. Dimanche 22 novembre 2026, 13h00.">
+{% endblock %}
+
+{% set prix = prix_billet|number_format(0, ',', ' ') %}
+{% set debut_iso = debut_projection|date('c') %}
+
+{% set programme = [
+    { heure: '12h30', titre: 'Installation en salle', desc: 'Chacun prend place. Fermeture des portes à 12h55.' },
+    { heure: '13h00 – 15h00', titre: "Projection de l'émission", desc: "Deux heures sur grand écran avec l'humoriste Edgar-Yves.", highlight: true },
+] %}
+
+{% set pour_qui = [
+    'Vous écoutez des podcasts chaque semaine et voulez voir les visages derrière les voix.',
+    "Vous créez du contenu audio ou vidéo et cherchez l'inspiration et des rencontres utiles.",
+    "Vous aimez l'humour qui ose et les sorties qui sortent de l'ordinaire à Cotonou.",
+    "Votre marque veut se rapprocher d'une communauté jeune, curieuse et connectée.",
+] %}
+
+{% block body %}
+{# ---------- En-tête ---------- #}
+<header class="container site-header">
+    <a href="{{ path('app_home') }}" class="brand" aria-label="Podlab × Bénin Bouge">
+        <img src="{{ asset('images/logo-podlab.jpg') }}" alt="Podlab" class="brand__podlab">
+        <span class="brand__times" aria-hidden="true">×</span>
+        <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="brand__bb">
+    </a>
+    <nav class="site-nav" aria-label="Navigation principale">
+        <a href="#invite" class="site-nav__link">L'invité</a>
+        <a href="#programme" class="site-nav__link">Programme</a>
+        <a href="#lieu" class="site-nav__link">Le lieu</a>
+        <a href="#tarifs" class="site-nav__link">Billet</a>
+        <a href="#reservation" class="btn btn--primary btn--sm">Réserver</a>
+    </nav>
+</header>
+
+<main>
+    {# ---------- Hero ---------- #}
+    <section class="container hero">
+        <p class="hero__kicker">Podlab × Bénin Bouge présentent · Une séance sur grand écran</p>
+        <h1 class="hero__title"><span class="hero__line">Avant-Première du Podcast</span> <span class="hero__line">de Edgar-Yves au Cinéma</span></h1>
+        <p class="hero__intro">Le podcast quitte les écouteurs et s'installe dans une vraie salle de cinéma. Deux heures d'émission projetées sur grand écran, avec un invité d'honneur&nbsp;: l'humoriste franco-béninois <strong>Edgar-Yves</strong>.</p>
+
+        <div class="facts">
+            <div class="fact card">
+                <p class="label">Date</p>
+                <p class="fact__value">Dimanche 22 novembre 2026</p>
+            </div>
+            <div class="fact card">
+                <p class="label">Heure</p>
+                <p class="fact__value">13h00 précises<br><span class="fact__note">Portes ouvertes dès 12h30</span></p>
+            </div>
+            <div class="fact card">
+                <p class="label">Lieu</p>
+                <p class="fact__value">Majestic Cinéma,&nbsp;<br>Sofitel Marina Hotel</p>
+            </div>
+        </div>
+
+        {# Décompte #}
+        <div class="countdown" data-controller="countdown" data-countdown-target-value="{{ debut_iso }}">
+            <div data-countdown-target="running" {{ decompte.ended ? 'hidden' }}>
+                <p class="countdown__heading">Début de la projection dans</p>
+                <div class="countdown__grid" role="timer" aria-live="off">
+                    <div class="countdown__unit">
+                        <p class="countdown__value" data-countdown-target="days">{{ decompte.d }}</p>
+                        <p class="label">Jours</p>
+                    </div>
+                    <div class="countdown__unit">
+                        <p class="countdown__value" data-countdown-target="hours">{{ decompte.h }}</p>
+                        <p class="label">Heures</p>
+                    </div>
+                    <div class="countdown__unit">
+                        <p class="countdown__value" data-countdown-target="minutes">{{ decompte.m }}</p>
+                        <p class="label">Minutes</p>
+                    </div>
+                    <div class="countdown__unit">
+                        <p class="countdown__value" data-countdown-target="seconds">{{ decompte.s }}</p>
+                        <p class="label">Secondes</p>
+                    </div>
+                </div>
+            </div>
+            <div data-countdown-target="ended" {{ decompte.ended ? '' : 'hidden' }}>
+                <p class="countdown__ended-title">La projection a commencé.</p>
+                <p class="countdown__ended-text">Merci d'avoir été là. Suivez Podlab pour la prochaine séance.</p>
+            </div>
+        </div>
+
+        <div class="hero__cta">
+            <a href="#reservation" class="btn btn--primary btn--lg">
+                Je réserve ma place · {{ prix }}&nbsp;FCFA
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
+            <span class="hero__cta-note">Places limitées à la capacité de la salle</span>
+        </div>
+    </section>
+
+    {# ---------- Bandeau écran ---------- #}
+    <section class="container">
+        <div class="screen">
+            <img src="{{ asset('images/salle-majestic-marina.webp') }}" alt="La salle du Majestic Marina : rangées de fauteuils inclinables en velours rouge" class="media-cover">
+            <p class="pill pill--dark">La salle du Majestic Marina</p>
+        </div>
+    </section>
+
+    {# ---------- Le concept ---------- #}
+    <section class="container section split concept">
+        <div>
+            <p class="eyebrow">Le concept</p>
+            <h2 class="h2">Écouter un podcast, c'est intime. Le vivre en salle, c'est autre chose.</h2>
+        </div>
+        <div class="lead concept__body">
+            <p>Podlab et Bénin Bouge réunissent leurs communautés pour une séance unique au Majestic Marina, la salle de cinéma du Sofitel Marina Hotel à Cotonou. Son, image et lumière d'un vrai cinéma au service des histoires que vous aimez écouter.</p>
+            <p>Au programme&nbsp;: une émission Podlab de deux heures avec Edgar-Yves, projetée sur grand écran à 13h00 précises. [TITRE DE L'ÉMISSION]</p>
+        </div>
+    </section>
+
+    {# ---------- Focus invité ---------- #}
+    <section id="invite" class="container section">
+        <div class="split guest card">
+            <div class="guest__media">
+                <img src="{{ asset('images/edgar-yves.jpg') }}" alt="L'humoriste Edgar-Yves, éclat de rire, en noir et blanc" class="media-cover">
+                <p class="pill pill--accent">Invité d'honneur</p>
+            </div>
+            <div class="guest__body">
+                <p class="eyebrow">Focus invité</p>
+                <div>
+                    <h2 class="guest__name">Edgar-Yves</h2>
+                    <p class="guest__role">Edgar-Yves Monnou Junior · humoriste de stand-up franco-béninois</p>
+                </div>
+                <p class="lead">Né au Bénin en 1987, Edgar-Yves a laissé tomber ses études de droit pour la scène. Il fait ses armes dans les comedy clubs de Nantes, puis s'impose à Paris, du Jamel Comedy Club à La Cigale. Son humour mêle autodérision, satire sociale et regard sur l'identité afro-européenne, sans filtre et sans leçon de morale.</p>
+                <blockquote class="guest__quote">« Si la presse est le quatrième pouvoir, l'humour doit être le cinquième. »</blockquote>
+                <div class="guest__facts">
+                    <div class="guest__fact">
+                        <p class="label">Spectacle</p>
+                        <p class="fact__value">Solide</p>
+                    </div>
+                    <div class="guest__fact">
+                        <p class="label">Nouveau spectacle</p>
+                        <p class="fact__value">Vigilance</p>
+                    </div>
+                    <div class="guest__fact">
+                        <p class="label">Radio</p>
+                        <p class="fact__value">Chroniqueur, Rires et Chansons</p>
+                    </div>
+                </div>
+                <p class="muted">Après une tournée qui l'a mené jusqu'à l'Adidas Arena à Paris, il pose ses valises à Cotonou, chez lui, pour une rencontre en salle avec le public de Podlab et de Bénin Bouge.</p>
+                <div>
+                    <a href="#reservation" class="btn btn--primary">Je veux voir Edgar-Yves</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# ---------- Pour qui ---------- #}
+    <section class="container section">
+        <p class="eyebrow">Pour qui ?</p>
+        <h2 class="h2 u-mb-40">Cette séance est faite pour vous si…</h2>
+        <div class="audience">
+            {% for texte in pour_qui %}
+                <div class="audience__item card">
+                    <p class="audience__num">{{ '%02d'|format(loop.index) }}</p>
+                    <p>{{ texte }}</p>
+                </div>
+            {% endfor %}
+        </div>
+        <div class="u-mt-32">
+            <a href="#reservation" class="btn btn--outline">Je veux en être</a>
+        </div>
+    </section>
+
+    {# ---------- Programme ---------- #}
+    <section id="programme" class="container section">
+        <p class="eyebrow">Programme</p>
+        <h2 class="h2 u-mb-12">Le déroulé de l'après-midi</h2>
+        <p class="lead u-mb-40">La projection démarre à 13h00 précises&nbsp;: les portes de la salle ferment à 12h55.</p>
+        <div class="schedule">
+            {% for etape in programme %}
+                <div class="schedule__row{{ etape.highlight|default(false) ? ' schedule__row--highlight' }}">
+                    <p class="schedule__time">{{ etape.heure }}</p>
+                    <div>
+                        <p class="schedule__title">{{ etape.titre }}</p>
+                        <p class="schedule__desc">{{ etape.desc }}</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    {# ---------- Lieu ---------- #}
+    <section id="lieu" class="container section">
+        <div class="split venue">
+            <div class="venue__info">
+                <p class="eyebrow">Le lieu</p>
+                <h2 class="venue__name">Majestic Marina</h2>
+                <p class="venue__sub">Salle de cinéma du Sofitel Cotonou Marina Hotel</p>
+                <p class="venue__address">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+                    Boulevard de la Marina, Cotonou, Bénin
+                </p>
+                <a href="https://www.google.com/maps/search/?api=1&amp;query={{ 'Sofitel Cotonou Marina Hotel, Boulevard de la Marina, Cotonou'|url_encode }}" target="_blank" rel="noopener" class="btn btn--dark btn--md">Ouvrir dans Google Maps</a>
+            </div>
+            <div class="venue__media">
+                <img src="{{ asset('images/salle-majestic-marina.webp') }}" alt="Fauteuils en velours rouge avec tablettes, salle du Majestic Marina" class="media-cover" loading="lazy">
+            </div>
+        </div>
+    </section>
+
+    {# ---------- Billet ---------- #}
+    <section id="tarifs" class="container section">
+        <div class="split tickets">
+            <div>
+                <p class="eyebrow">Billetterie</p>
+                <h2 class="h2 u-mb-16">Un billet, une place, deux heures d'émission.</h2>
+                <p class="lead">Une salle de cinéma, ce sont des sièges comptés&nbsp;: [NOMBRE] places disponibles, pas une de plus.</p>
+            </div>
+            <div class="ticket">
+                <div class="ticket__head">
+                    <p class="ticket__kind">Billet unique</p>
+                    <p class="ticket__date">Dim. 22 nov. · 13h00</p>
+                </div>
+                <p class="ticket__price">{{ prix }} <span class="ticket__currency">FCFA</span></p>
+                <div class="ticket__divider"></div>
+                <ul class="ticket__perks">
+                    <li>Accès à la projection de l'émission (2&nbsp;h)</li>
+                    <li>Avec l'humoriste Edgar-Yves</li>
+                    <li>Projection à 13h00 précises, portes fermées à 12h55</li>
+                </ul>
+                <a href="#reservation" class="btn btn--primary btn--lg btn--block">Je prends mon billet</a>
+            </div>
+        </div>
+    </section>
+
+    {# ---------- Réservation ---------- #}
+    <section id="reservation" class="container section">
+        <div class="split booking">
+            <div>
+                <p class="eyebrow">Réservation</p>
+                <h2 class="booking__title">Votre fauteuil vous attend.</h2>
+                <p class="booking__lead">Choisissez votre billet, réglez en ligne et recevez-le par e-mail.</p>
+                <div data-controller="countdown" data-countdown-target-value="{{ debut_iso }}">
+                    <p class="booking__countdown" data-countdown-target="running" {{ decompte.ended ? 'hidden' }}>
+                        Projection dans
+                        <span class="booking__countdown-value"><span data-countdown-target="days">{{ decompte.d }}</span>&nbsp;j <span data-countdown-target="hours">{{ decompte.h }}</span>&nbsp;h <span data-countdown-target="minutes">{{ decompte.m }}</span>&nbsp;min <span data-countdown-target="seconds">{{ decompte.s }}</span>&nbsp;s</span>
+                    </p>
+                </div>
+            </div>
+
+            {# Billetterie tick.africa : la couleur primaire reprend l'accent du site (#F5B82E) #}
+            <div class="booking__embed" data-controller="tickafrica">
+                <iframe src="https://tick.africa/embed/podlab-au-cinema?primary=F5B82E"
+                        title="Billetterie Podlab au Cinéma"
+                        class="booking__iframe" height="520" loading="lazy"
+                        data-tickafrica-target="frame"></iframe>
+            </div>
+        </div>
+    </section>
+
+    {# ---------- Partenaires ---------- #}
+    <section class="container section">
+        <div class="partners">
+            <div class="partner card">
+                <p class="eyebrow">Une co-organisation</p>
+                <div class="partner__logos">
+                    <img src="{{ asset('images/logo-podlab.jpg') }}" alt="Podlab" class="partner__podlab" loading="lazy">
+                    <span class="partner__times" aria-hidden="true">×</span>
+                    <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="partner__bb" loading="lazy">
+                </div>
+                <p class="muted">Podlab et Bénin Bouge s'associent pour faire vivre le podcast autrement, en salle et en communauté.</p>
+            </div>
+            <div class="partner card">
+                <p class="eyebrow">Sponsor officiel</p>
+                <img src="{{ asset('images/logo-majestic-benin.webp') }}" alt="Majestic Bénin" class="partner__sponsor" loading="lazy">
+                <p class="muted">Merci à Majestic Bénin, qui accueille la séance dans sa salle du Majestic Marina.</p>
+            </div>
+        </div>
+    </section>
+</main>
+
+{# ---------- Footer ---------- #}
+<footer class="container site-footer">
+    <div class="site-footer__brand">
+        <img src="{{ asset('images/logo-podlab.jpg') }}" alt="Podlab" class="site-footer__podlab" loading="lazy">
+        <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="site-footer__bb" loading="lazy">
+        <span>Podlab × Bénin Bouge · Majestic Marina, Sofitel Marina Hotel, Cotonou</span>
+    </div>
+    <span>Infos&nbsp;: [CONTACT WHATSAPP / E-MAIL]</span>
+</footer>
+{% endblock %}
