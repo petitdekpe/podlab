@@ -3,22 +3,45 @@
 {% block title %}Avant-Première Podlab - Majestic Marina{% endblock %}
 
 {% block meta %}
-    <meta name="description" content="Avant-première du podcast Podlab avec l'humoriste Edgar-Yves, sur grand écran au Majestic Marina, Sofitel Marina Hotel, Cotonou. Dimanche 22 novembre 2026, 13h00.">
+    {% set apercu_titre = 'Avant-Première Podlab' %}
+    {% set apercu_description = "Edgar-Yves : Moi, à quatre pattes ?! Ceci n'est pas un podcast, ceci n'est pas un stand-up, c'est un sit-down. Dimanche 22 novembre 2026, 13h00, Majestic Cinéma, Sofitel Marina, Cotonou." %}
+    <meta name="description" content="{{ apercu_description }}">
+
+    {# Aperçu du lien (WhatsApp, Facebook, LinkedIn, X…) #}
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="fr_FR">
+    <meta property="og:site_name" content="Podlab × Bénin Bouge">
+    <meta property="og:title" content="{{ apercu_titre }}">
+    <meta property="og:description" content="{{ apercu_description }}">
+    <meta property="og:url" content="{{ absolute_url(path('app_home')) }}">
+    <meta property="og:image" content="{{ absolute_url(asset('images/og-avant-premiere.png')) }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Podlab × Bénin Bouge">
+    <meta name="twitter:card" content="summary_large_image">
 {% endblock %}
 
 {% set prix = prix_billet|number_format(0, ',', ' ') %}
 {% set debut_iso = debut_projection|date('c') %}
 
 {% set programme = [
-    { heure: '12h30', titre: 'Installation en salle', desc: 'Chacun prend place. Fermeture des portes à 12h55.' },
-    { heure: '13h00 – 15h00', titre: "Projection de l'émission", desc: "Deux heures sur grand écran avec l'humoriste Edgar-Yves.", highlight: true },
+    { heure: '12h30', titre: 'Accueil et installation' },
+    { heure: '12h55', titre: 'Fermeture des portes', desc: 'Aucune entrée après, même avec un billet.' },
+    { heure: '13h00 – 15h00', titre: 'Moi, à quatre pattes ?!', desc: "L'Édition Spéciale Podlab × Bénin Bouge sur grand écran.", highlight: true },
 ] %}
 
 {% set pour_qui = [
-    'Vous écoutez des podcasts chaque semaine et voulez voir les visages derrière les voix.',
-    "Vous créez du contenu audio ou vidéo et cherchez l'inspiration et des rencontres utiles.",
-    "Vous aimez l'humour qui ose et les sorties qui sortent de l'ordinaire à Cotonou.",
-    "Votre marque veut se rapprocher d'une communauté jeune, curieuse et connectée.",
+    'Vous voulez passer un dimanche inoubliable, entre amis, en famille ou en couple.',
+    "Vous avez envie d'un vrai moment de fou rire.",
+    "Vous êtes fan des émissions Podlab ou des spectacles d'Edgar-Yves.",
+    "Vous voulez vivre une expérience au-dessus de tout ce que vous avez déjà vécu en podcast.",
+] %}
+
+{% set a_entendre = [
+    "Pourquoi, pour des parents béninois, « humoriste » n'est pas un métier… et comment son père a changé d'avis le jour où ça a marché.",
+    "Le jour où sa maman a décidé de le « protéger ». Il n'était pas prêt.",
+    "Pourquoi au Bénin, quelqu'un que vous avez croisé deux fois vous connaît déjà.",
+    "Ce que 20 ans en France ne vous apprennent pas sur votre propre pays.",
 ] %}
 
 {% block body %}
@@ -41,9 +64,10 @@
     <main>
         {# ---------- Hero ---------- #}
         <section class="container hero">
-            <p class="hero__kicker">Podlab × Bénin Bouge présentent · Une séance sur grand écran</p>
-            <h1 class="hero__title"><span class="hero__line">Avant-Première du Podcast</span> <span class="hero__line">de Edgar-Yves au Cinéma</span></h1>
-            <p class="hero__intro">Le podcast quitte les écouteurs et s'installe dans une vraie salle de cinéma. Deux heures d'émission projetées sur grand écran, avec un invité d'honneur&nbsp;: l'humoriste franco-béninois <strong>Edgar-Yves</strong>.</p>
+            <p class="hero__kicker">Édition spéciale Podlab × Bénin Bouge</p>
+            <h1 class="hero__title"><span class="hero__line">Edgar-Yves&nbsp;:</span> <span class="hero__line">Moi, à quatre pattes&nbsp;?!</span></h1>
+            <p class="hero__tagline">Ceci n'est pas un podcast. Ceci n'est pas un <span class="nowrap">stand-up</span>. Ceci est un <span class="nowrap">sit-down</span>.</p>
+            <p class="hero__intro">Edgar-Yves vit à l'étranger depuis 20 ans et revient au Bénin de temps à autre. Cette année, lors de son séjour, le pays ne l'a pas raté. Pendant deux heures, il raconte avec Beni Tossou des histoires vécues cette année, qu'il n'a jamais racontées nulle part. Enregistré dans les studios Podlab, projeté sur grand écran en partenariat avec Bénin Bouge.</p>
 
             <div class="facts">
                 <div class="fact card">
@@ -52,11 +76,11 @@
                 </div>
                 <div class="fact card">
                     <p class="label">Heure</p>
-                    <p class="fact__value">13h00 précises<br><span class="fact__note">Portes ouvertes dès 12h30</span></p>
+                    <p class="fact__value">13h00<br><span class="fact__note">Ouverture des portes à 12h30</span></p>
                 </div>
                 <div class="fact card">
                     <p class="label">Lieu</p>
-                    <p class="fact__value">Majestic Cinéma,&nbsp;<br>Sofitel Marina Hotel</p>
+                    <p class="fact__value">Majestic Cinéma,&nbsp;<br>Sofitel Marina, Cotonou</p>
                 </div>
             </div>
 
@@ -91,10 +115,10 @@
 
             <div class="hero__cta">
                 <a href="#reservation" class="btn btn--primary btn--lg">
-                    Je réserve ma place · {{ prix }}&nbsp;FCFA
+                    Je réserve ma place — {{ prix }}&nbsp;FCFA
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                 </a>
-                <span class="hero__cta-note">Places limitées à la capacité de la salle</span>
+                <span class="hero__cta-note">Places limitées.</span>
             </div>
         </section>
 
@@ -109,11 +133,18 @@
         <section class="container section split concept">
             <div>
                 <p class="eyebrow">Le concept</p>
-                <h2 class="h2">Écouter un podcast, c'est intime. Le vivre en salle, c'est autre chose.</h2>
+                <h2 class="h2">Un spectacle avant l'heure</h2>
             </div>
             <div class="lead concept__body">
-                <p>Podlab et Bénin Bouge réunissent leurs communautés pour une séance unique au Majestic Marina, la salle de cinéma du Sofitel Marina Hotel à Cotonou. Son, image et lumière d'un vrai cinéma au service des histoires que vous aimez écouter.</p>
-                <p>Au programme&nbsp;: une émission Podlab de deux heures avec Edgar-Yves, projetée sur grand écran à 13h00 précises.<p>
+                <p>Podlab, ce sont des conversations avec ceux qui font l'Afrique. Cette fois, avec Bénin Bouge, on a voulu aller plus loin.</p>
+                <p>Edgar-Yves n'est pas venu faire un podcast. Il est venu raconter, avec l'humour qu'on lui connaît, ce qu'il a vécu cette année au Bénin&nbsp;: la famille, les parents, les croyances, les codes qu'il croyait connaître et qui l'ont pris de court.</p>
+                <p>Résultat&nbsp;: deux heures qui ressemblent plus à un spectacle qu'à une interview. Alors on a décidé de vous le faire vivre comme un spectacle&nbsp;: en salle, sur grand écran, avec le son du cinéma et le rire de toute une salle.</p>
+                <ul class="bullets">
+                    <li><strong>Inédit.</strong> Des histoires vécues cette année, racontées ici pour la première fois. Ni en podcast, ni sur scène, ni sur les réseaux.</li>
+                    <li><strong>En avant-première.</strong> Vous le découvrez avant tout le monde.</li>
+                    <li><strong>Une expérience de salle.</strong> Grand écran, son cinéma, et le plaisir de rire ensemble.</li>
+                </ul>
+                <p class="concept__closing">Vous croyez connaître Edgar-Yves&nbsp;? Vous n'avez pas encore entendu celle-là.</p>
             </div>
         </section>
 
@@ -125,28 +156,19 @@
                     <p class="pill pill--accent">Invité d'honneur</p>
                 </div>
                 <div class="guest__body">
-                    <p class="eyebrow">Focus invité</p>
-                    <div>
-                        <h2 class="guest__name">Edgar-Yves</h2>
-                        <p class="guest__role">Edgar-Yves Monnou Junior · humoriste de stand-up franco-béninois</p>
-                    </div>
-                    <p class="lead">Né au Bénin en 1987, Edgar-Yves a laissé tomber ses études de droit pour la scène. Il fait ses armes dans les comedy clubs de Nantes, puis s'impose à Paris, du Jamel Comedy Club à La Cigale. Son humour mêle autodérision, satire sociale et regard sur l'identité afro-européenne, sans filtre et sans leçon de morale.</p>
+                    <p class="eyebrow">L'invité</p>
+                    <h2 class="h2">Edgar-Yves comme vous ne l'avez jamais entendu</h2>
+                    <p class="lead">Né au Bénin en 1987, Edgar-Yves a lâché le droit pour l'humour. Formé dans les comedy clubs de Nantes, passé par le Jamel Comedy Club et La Cigale, il tourne aujourd'hui jusqu'à l'Adidas Arena. Son terrain de jeu&nbsp;: l'autodérision et le choc entre l'Afrique et l'Europe.</p>
                     <blockquote class="guest__quote">« Si la presse est le quatrième pouvoir, l'humour doit être le cinquième. »</blockquote>
-                    <div class="guest__facts">
-                        <div class="guest__fact">
-                            <p class="label">Spectacle</p>
-                            <p class="fact__value">Solide</p>
-                        </div>
-                        <div class="guest__fact">
-                            <p class="label">Nouveau spectacle</p>
-                            <p class="fact__value">Vigilance</p>
-                        </div>
-                        <div class="guest__fact">
-                            <p class="label">Radio</p>
-                            <p class="fact__value">Chroniqueur, Rires et Chansons</p>
-                        </div>
+                    <div>
+                        <p class="guest__listen-title">Ce que vous allez entendre</p>
+                        <ul class="bullets">
+                            {% for item in a_entendre %}
+                                <li>{{ item }}</li>
+                            {% endfor %}
+                        </ul>
                     </div>
-                    <p class="muted guest__more">Après une tournée qui l'a mené jusqu'à l'Adidas Arena à Paris, il pose ses valises à Cotonou, chez lui, pour une rencontre en salle avec le public de Podlab et de Bénin Bouge.</p>
+                    <p class="guest__more">Et la réponse à la question que tout le monde va se poser&nbsp;: pourquoi «&nbsp;à quatre pattes&nbsp;»&nbsp;?</p>
                     <div>
                         <a href="#reservation" class="btn btn--primary">Je veux voir Edgar-Yves</a>
                     </div>
@@ -157,7 +179,7 @@
         {# ---------- Pour qui ---------- #}
         <section class="container section">
             <p class="eyebrow">Pour qui ?</p>
-            <h2 class="h2 u-mb-40">Cette séance est faite pour vous si…</h2>
+            <h2 class="h2 u-mb-40">Vous allez adorer si…</h2>
             <div class="audience">
                 {% for texte in pour_qui %}
                     <div class="audience__item card">
@@ -174,15 +196,14 @@
         {# ---------- Programme ---------- #}
         <section id="programme" class="container section">
             <p class="eyebrow">Programme</p>
-            <h2 class="h2 u-mb-12">Le déroulé de l'après-midi</h2>
-            <p class="lead u-mb-40">La projection démarre à 13h00 précises&nbsp;: les portes de la salle ferment à 12h55.</p>
+            <h2 class="h2 u-mb-40">Le déroulé de l'après-midi</h2>
             <div class="schedule">
                 {% for etape in programme %}
                     <div class="schedule__row{{ etape.highlight|default(false) ? ' schedule__row--highlight' }}">
                         <p class="schedule__time">{{ etape.heure }}</p>
                         <div>
                             <p class="schedule__title">{{ etape.titre }}</p>
-                            <p class="schedule__desc">{{ etape.desc }}</p>
+                            {% if etape.desc is defined %}<p class="schedule__desc">{{ etape.desc }}</p>{% endif %}
                         </div>
                     </div>
                 {% endfor %}
@@ -194,12 +215,13 @@
             <div class="split venue">
                 <div class="venue__info">
                     <p class="eyebrow">Le lieu</p>
-                    <h2 class="venue__name">Majestic Marina</h2>
-                    <p class="venue__sub">Salle de cinéma du Sofitel Cotonou Marina Hotel</p>
+                    <h2 class="venue__name">Majestic Cinéma</h2>
+                    <p class="venue__sub">Sofitel Marina Hotel</p>
                     <p class="venue__address">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
-                        Boulevard de la Marina, Cotonou, Bénin
+                        Boulevard de la Marina, Cotonou
                     </p>
+                    <p class="venue__lead">Fauteuils de cinéma, grand écran, son de salle&nbsp;: le cadre d'une vraie première.</p>
                     <a href="https://www.google.com/maps/search/?api=1&amp;query={{ 'Sofitel Cotonou Marina Hotel, Boulevard de la Marina, Cotonou'|url_encode }}" target="_blank" rel="noopener" class="btn btn--dark btn--md">Ouvrir dans Google Maps</a>
                 </div>
                 <div class="venue__media">
@@ -212,9 +234,9 @@
         <section id="tarifs" class="container section">
             <div class="split tickets">
                 <div>
-                    <p class="eyebrow">Billetterie</p>
-                    <h2 class="h2 u-mb-16">Un billet, une place, deux heures d'émission.</h2>
-                    <p class="lead">Une salle de cinéma, ce sont des sièges comptés&nbsp;: [NOMBRE] places disponibles, pas une de plus.</p>
+                    <p class="eyebrow">Billet</p>
+                    <h2 class="h2 u-mb-16">Votre place pour l'Édition Spéciale</h2>
+                    <p class="lead">Seulement [NOMBRE] places. Une fois la salle pleine, les réservations ferment.</p>
                 </div>
                 <div class="ticket">
                     <div class="ticket__head">
@@ -224,11 +246,10 @@
                     <p class="ticket__price">{{ prix }} <span class="ticket__currency">FCFA</span></p>
                     <div class="ticket__divider"></div>
                     <ul class="ticket__perks">
-                        <li>Accès à la projection de l'émission (2&nbsp;h)</li>
-                        <li>Avec l'humoriste Edgar-Yves</li>
-                        <li>Projection à 13h00 précises, portes fermées à 12h55</li>
+                        <li>2 heures d'histoires inédites avec Edgar-Yves et Beni Tossou</li>
+                        <li>Dimanche 22 novembre, 13h00 précises</li>
                     </ul>
-                    <a href="#reservation" class="btn btn--primary btn--lg btn--block">Je prends mon billet</a>
+                    <a href="#reservation" class="btn btn--primary btn--lg btn--block">Je réserve ma place</a>
                 </div>
             </div>
         </section>
@@ -238,8 +259,13 @@
             <div class="split booking">
                 <div>
                     <p class="eyebrow">Réservation</p>
-                    <h2 class="booking__title">Votre fauteuil vous attend.</h2>
-                    <p class="booking__lead">Choisissez votre billet, réglez en ligne et recevez-le par e-mail.</p>
+                    <h2 class="booking__title">Réservez en 2&nbsp;minutes</h2>
+                    <ol class="steps">
+                        <li>Choisissez votre billet.</li>
+                        <li>Payez en ligne.</li>
+                        <li>Recevez votre billet par e-mail et montrez-le à l'entrée.</li>
+                    </ol>
+                    <p class="booking__note">La salle se remplit. Ne soyez pas celui qui l'a vu sur les réseaux après tout le monde.</p>
                     <div data-controller="countdown" data-countdown-target-value="{{ debut_iso }}">
                         <p class="booking__countdown" data-countdown-target="running" {{ decompte.ended ? 'hidden' }}>
                             Projection dans
@@ -272,12 +298,10 @@
                         <span class="partner__times" aria-hidden="true">×</span>
                         <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="partner__bb" loading="lazy">
                     </div>
-                    <p class="muted">Podlab et Bénin Bouge s'associent pour faire vivre le podcast autrement, en salle et en communauté.</p>
                 </div>
                 <div class="partner card">
                     <p class="eyebrow">Sponsor officiel</p>
                     <img src="{{ asset('images/logo-majestic-benin.webp') }}" alt="Majestic Bénin" class="partner__sponsor" loading="lazy">
-                    <p class="muted">Merci à Majestic Bénin, qui accueille la séance dans sa salle du Majestic Marina.</p>
                 </div>
             </div>
         </section>
@@ -293,8 +317,8 @@
         <div class="site-footer__brand">
             <img src="{{ asset('images/logo-podlab.jpg') }}" alt="Podlab" class="site-footer__podlab" loading="lazy">
             <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="site-footer__bb" loading="lazy">
-            <span>Podlab × Bénin Bouge · Majestic Marina, Sofitel Marina Hotel, Cotonou</span>
+            <span>Une Édition Spéciale Podlab × Bénin Bouge, en partenariat avec Majestic Bénin, sponsor officiel.</span>
         </div>
-        <span>Infos&nbsp;: [CONTACT WHATSAPP / E-MAIL]</span>
+        <span>Une question&nbsp;? Écrivez-nous sur WhatsApp au [NUMÉRO] ou à [E-MAIL].</span>
     </footer>
 {% endblock %}

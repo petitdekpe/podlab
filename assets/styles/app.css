@@ -310,9 +310,19 @@ input:focus-visible {
     display: block;
 }
 
+.hero__tagline {
+    margin-top: 24px;
+    max-width: 900px;
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 2.2vw, 1.75rem);
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--color-accent);
+}
+
 .hero__intro {
-    margin-top: 28px;
-    max-width: 680px;
+    margin-top: 20px;
+    max-width: 760px;
     font-size: 21px;
     line-height: 1.5;
     color: var(--color-text-muted);
@@ -436,7 +446,43 @@ input:focus-visible {
     align-items: start;
 }
 
-.concept__body p + p { margin-top: 18px; }
+.concept__body p + p,
+.concept__body .bullets { margin-top: 18px; }
+
+.concept__closing {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--color-text);
+}
+
+/* Listes à puces d'accent (concept, invité) */
+.bullets {
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bullets li {
+    position: relative;
+    padding-left: 24px;
+}
+
+.bullets li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.7em;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-accent);
+}
+
+.bullets strong { color: var(--color-text); }
 
 /* ==========================================================================
    Guest
@@ -465,19 +511,25 @@ input:focus-visible {
 
 .guest__body .eyebrow { margin-bottom: 0; }
 
-.guest__name {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: clamp(2.5rem, 5vw, 4.5rem);
-    line-height: 0.95;
-    letter-spacing: -0.03em;
-}
-
-.guest__role {
-    margin-top: 10px;
-    font-size: 18px;
+.guest__listen-title {
+    margin-bottom: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
     color: var(--color-text-subtle);
 }
+
+.guest__body .bullets { color: var(--color-text-muted); }
+
+.guest__more {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+
 
 .guest__quote {
     padding: 22px 24px;
@@ -489,19 +541,8 @@ input:focus-visible {
     line-height: 1.25;
 }
 
-.guest__facts {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px;
-}
 
-.guest__fact {
-    padding: 16px 18px;
-    border-radius: 14px;
-    border: 1px solid var(--color-border);
-}
 
-.guest__fact .fact__value { font-size: 18px; }
 
 /* ==========================================================================
    Audience
@@ -607,6 +648,11 @@ input:focus-visible {
     margin-top: 2px;
 }
 
+.venue__lead {
+    margin-top: 18px;
+    font-weight: 500;
+}
+
 .venue__info .btn { margin-top: 28px; }
 
 .venue__media {
@@ -707,10 +753,43 @@ input:focus-visible {
     letter-spacing: -0.02em;
 }
 
-.booking__lead {
-    margin-top: 18px;
+.steps {
+    margin: 20px 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     font-size: 18px;
     color: var(--color-ink-muted);
+}
+
+.steps li {
+    counter-increment: step;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.steps li::before {
+    content: counter(step);
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--color-bg);
+    color: var(--color-accent);
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.booking__note {
+    margin-top: 20px;
+    font-weight: 600;
+    color: var(--color-bg);
 }
 
 .booking__countdown {
@@ -854,6 +933,8 @@ input:focus-visible {
     .guest__media { min-height: 300px; }
     .guest__body { padding: 24px 20px; gap: 16px; }
     .guest__quote { padding: 16px 18px; font-size: 20px; }
+    .guest__more { font-size: 18px; }
+    .concept__closing { font-size: 20px; }
     .guest__body .btn { width: 100%; }
 
     .audience { gap: 10px; }
@@ -883,8 +964,6 @@ input:focus-visible {
     /* --- Contenu allégé sur mobile (doublons ou secondaire) --- */
     #tarifs,                  /* la billetterie intégrée affiche déjà le billet et le prix */
     .venue__media,            /* même photo que le bandeau en haut de page */
-    .guest__facts,
-    .guest__more,
     .audience__cta,
     .booking__countdown,      /* le décompte est déjà dans le hero */
     .partner--organizers,     /* logos déjà dans l'en-tête et le pied de page */
@@ -926,3 +1005,4 @@ input:focus-visible {
 .u-mb-16 { margin-bottom: 16px; }
 .u-mb-40 { margin-bottom: 40px; }
 .u-mt-32 { margin-top: 32px; }
+.nowrap { white-space: nowrap; }
