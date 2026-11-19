@@ -1,0 +1,98 @@
+{% extends 'admin/layout.html.twig' %}
+{% import _self as m %}
+{% set active = 'codes' %}
+
+{% macro fmt(c) %}{{ c|slice(0, 2) }}-{{ c|slice(2, 4) }}-{{ c|slice(6) }}{% endmacro %}
+
+{% block admin_title %}Codes{% endblock %}
+
+{% block admin_content %}
+    <h1 class="adm-h1">Codes d'accès <span class="adm-muted">({{ total }})</span></h1>
+
+    <section class="adm-card adm-toolbar">
+        <form method="get" class="adm-search">
+            <label class="adm-sr" for="q">Rechercher</label>
+            <input id="q" name="q" type="search" class="adm-input" value="{{ q }}" placeholder="Rechercher un code ou un libellé">
+            <label class="adm-sr" for="statut">Statut</label>
+            <select id="statut" name="statut" class="adm-input">
+                <option value="all"{{ status == 'all' ? ' selected' }}>Tous</option>
+                <option value="unused"{{ status == 'unused' ? ' selected' }}>Jamais utilisés</option>
+                <option value="used"{{ status == 'used' ? ' selected' }}>Utilisés</option>
+                <option value="revoked"{{ status == 'revoked' ? ' selected' }}>Révoqués</option>
+            </select>
+            <button type="submit" class="adm-btn">Filtrer</button>
+        </form>
+
+        <form method="post" action="{{ path('app_admin_codes_generate') }}" class="adm-search">
+            <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+            <label class="adm-sr" for="count">Nombre de codes à ajouter</label>
+            <input id="count" name="count" type="number" min="1" max="{{ max_generate }}" value="10" class="adm-input adm-input--small">
+            <button type="submit" class="adm-btn adm-btn--primary">Générer</button>
+        </form>
+
+        <a class="adm-btn" href="{{ path('app_admin_codes_export') }}">Exporter (CSV)</a>
+    </section>
+
+    <div class="adm-tablewrap">
+        <table class="adm-table">
+            <thead>
+                <tr>
+                    <th scope="col">Code</th>
+                    <th scope="col">Libellé</th>
+                    <th scope="col">Statut</th>
+                    <th scope="col">1ʳᵉ connexion</th>
+                    <th scope="col">Dernière activité</th>
+                    <th scope="col"><span class="adm-sr">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for code in items %}
+                    <tr class="{{ code.revoked ? 'is-revoked' }}">
+                        <td data-label="Code"><code class="adm-code">{{ m.fmt(code.code) }}</code></td>
+                        <td data-label="Libellé">
+                            <form method="post" action="{{ path('app_admin_code_label', {id: code.id}) }}" class="adm-inline">
+                                <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                                <input type="hidden" name="back" value="{{ back }}">
+                                <label class="adm-sr" for="label-{{ code.id }}">Libellé du code {{ m.fmt(code.code) }}</label>
+                                <input id="label-{{ code.id }}" name="label" type="text" class="adm-input adm-input--inline" maxlength="160" value="{{ code.label }}" placeholder="Nom, référence Tickafrica…">
+                                <button type="submit" class="adm-btn adm-btn--small">OK</button>
+                            </form>
+                        </td>
+                        <td data-label="Statut">
+                            {% if code.revoked %}<span class="adm-tag adm-tag--bad">Révoqué</span>
+                            {% elseif code.firstUsedAt is null %}<span class="adm-tag">Jamais utilisé</span>
+                            {% elseif code.claimToken %}<span class="adm-tag adm-tag--ok">Utilisé · connecté</span>
+                            {% else %}<span class="adm-tag adm-tag--ok">Utilisé</span>{% endif %}
+                        </td>
+                        <td data-label="1ʳᵉ connexion">{{ code.firstUsedAt ? code.firstUsedAt|date('d/m H:i', 'Africa/Porto-Novo') : '—' }}</td>
+                        <td data-label="Dernière activité">{{ code.lastSeenAt ? code.lastSeenAt|date('d/m H:i', 'Africa/Porto-Novo') : '—' }}</td>
+                        <td data-label="Actions" class="adm-cell-actions">
+                            {% if code.claimToken and not code.revoked %}
+                                <form method="post" action="{{ path('app_admin_code_disconnect', {id: code.id}) }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                                    <input type="hidden" name="back" value="{{ back }}">
+                                    <button type="submit" class="adm-btn adm-btn--small">Déconnecter</button>
+                                </form>
+                            {% endif %}
+                            <form method="post" action="{{ path('app_admin_code_revoke', {id: code.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                                <input type="hidden" name="back" value="{{ back }}">
+                                <button type="submit" class="adm-btn adm-btn--small{{ code.revoked ? '' : ' adm-btn--danger' }}">{{ code.revoked ? 'Réactiver' : 'Révoquer' }}</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="adm-empty">Aucun code ne correspond.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pages > 1 %}
+        <nav class="adm-pager" aria-label="Pagination">
+            {% if page > 1 %}<a class="adm-btn adm-btn--small" href="{{ path('app_admin_codes', {q: q, statut: status, page: page - 1}) }}">← Précédent</a>{% endif %}
+            <span class="adm-muted">Page {{ page }} / {{ pages }}</span>
+            {% if page < pages %}<a class="adm-btn adm-btn--small" href="{{ path('app_admin_codes', {q: q, statut: status, page: page + 1}) }}">Suivant →</a>{% endif %}
+        </nav>
+    {% endif %}
+{% endblock %}

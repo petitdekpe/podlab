@@ -1,0 +1,39 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{% block admin_title %}Administration{% endblock %} · Podlab × Bénin Bouge{% endblock %}
+
+{% block meta %}
+    <meta name="robots" content="noindex, nofollow">
+{% endblock %}
+
+{% block body %}
+    <header class="adm-top">
+        <div class="adm-top__in">
+            <a href="{{ path('app_admin') }}" class="adm-brand">
+                <img src="{{ asset('images/logo-podlab.jpg') }}" alt="" class="adm-brand__logo">
+                <span>Administration du direct</span>
+            </a>
+            <nav class="adm-nav" aria-label="Administration">
+                <a href="{{ path('app_admin') }}" class="adm-nav__link{{ active|default('') == 'dashboard' ? ' is-active' }}">Tableau de bord</a>
+                <a href="{{ path('app_admin_codes') }}" class="adm-nav__link{{ active|default('') == 'codes' ? ' is-active' }}">Codes</a>
+                <a href="{{ path('app_admin_settings') }}" class="adm-nav__link{{ active|default('') == 'settings' ? ' is-active' }}">Paramètres</a>
+                <a href="{{ path('app_live') }}" class="adm-nav__link" target="_blank" rel="noopener">Page du direct ↗</a>
+            </nav>
+            <form method="post" action="{{ path('app_admin_logout') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                <button type="submit" class="adm-btn adm-btn--ghost">Se déconnecter</button>
+            </form>
+        </div>
+    </header>
+
+    <main class="adm-main">
+        {% for message in app.flashes('admin_ok') %}
+            <p class="adm-alert adm-alert--ok" role="status">{{ message }}</p>
+        {% endfor %}
+        {% for message in app.flashes('admin_error') %}
+            <p class="adm-alert adm-alert--error" role="alert">{{ message }}</p>
+        {% endfor %}
+
+        {% block admin_content %}{% endblock %}
+    </main>
+{% endblock %}

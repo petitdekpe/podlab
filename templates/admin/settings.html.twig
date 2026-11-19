@@ -1,0 +1,61 @@
+{% extends 'admin/layout.html.twig' %}
+{% set active = 'settings' %}
+
+{% block admin_title %}Paramètres{% endblock %}
+
+{% block admin_content %}
+    <h1 class="adm-h1">Paramètres du direct</h1>
+
+    {% for error in errors %}
+        <p class="adm-alert adm-alert--error" role="alert">{{ error }}</p>
+    {% endfor %}
+
+    <form method="post" class="adm-card adm-form adm-form--wide">
+        <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+
+        <label class="adm-label" for="title">Titre affiché sur la page du direct</label>
+        <input id="title" name="title" type="text" class="adm-input" maxlength="120" value="{{ form.title }}">
+
+        <label class="adm-label" for="youtube">Vidéo YouTube du direct</label>
+        <input id="youtube" name="youtube" type="text" class="adm-input" value="{{ form.youtube }}" placeholder="https://www.youtube.com/watch?v=… ou identifiant" autocomplete="off" spellcheck="false">
+        <p class="adm-help">Vidéo « non répertoriée », intégration autorisée, <strong>option DVR désactivée</strong> dans YouTube Studio (sinon les spectateurs peuvent reculer). Jamais visible dans le code de la page : elle n'est fournie qu'aux billets valides.</p>
+
+        <div class="adm-row">
+            <div>
+                <label class="adm-label" for="opens_at">Ouverture du direct</label>
+                <input id="opens_at" name="opens_at" type="datetime-local" class="adm-input" value="{{ form.opens_at }}" required>
+            </div>
+            <div>
+                <label class="adm-label" for="ends_at">Fin du direct</label>
+                <input id="ends_at" name="ends_at" type="datetime-local" class="adm-input" value="{{ form.ends_at }}" required>
+            </div>
+        </div>
+        <p class="adm-help">Heure du Bénin ({{ timezone }}). Avant l'ouverture, les spectateurs voient un décompte. Après la fin, la vidéo est retirée.</p>
+
+        <label class="adm-check">
+            <input type="checkbox" name="enabled" value="1"{{ form.enabled ? ' checked' }}>
+            <span><strong>Accès ouvert</strong><br><span class="adm-muted">Décochez pour fermer l'accès à tous les billets d'un coup (le supercode reste valable).</span></span>
+        </label>
+
+        <label class="adm-check">
+            <input type="checkbox" name="watermark" value="1"{{ form.watermark ? ' checked' }}>
+            <span><strong>Filigrane avec le numéro du billet</strong><br><span class="adm-muted">Un texte discret se déplace sur la vidéo : il permet de retrouver l'origine d'un enregistrement partagé.</span></span>
+        </label>
+
+        <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary">Enregistrer</button></p>
+    </form>
+
+    <section class="adm-card">
+        <h2 class="adm-h2">Supercode</h2>
+        <p class="adm-muted">Le supercode ouvre cet espace d'administration et donne accès au direct à tout moment, sur autant d'appareils que nécessaire. Il ne s'affiche qu'une fois : en créer un nouveau désactive immédiatement l'ancien.</p>
+
+        {% for code in app.flashes('admin_supercode') %}
+            <p class="adm-alert adm-alert--ok" role="status">Nouveau supercode (à noter maintenant, il ne sera plus affiché) :<br><code class="adm-secret">{{ code }}</code></p>
+        {% endfor %}
+
+        <form method="post" action="{{ path('app_admin_supercode') }}" onsubmit="return confirm('Créer un nouveau supercode ? L\'ancien cessera de fonctionner immédiatement.');">
+            <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+            <button type="submit" class="adm-btn adm-btn--danger">Créer un nouveau supercode</button>
+        </form>
+    </section>
+{% endblock %}

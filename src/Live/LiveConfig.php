@@ -1,0 +1,18 @@
+<?php
+
+namespace App\Live;
+
+/**
+ * Valeurs PAR DÉFAUT du direct, lues dans l'environnement (.env / .env.local).
+ * Les valeurs saisies dans l'espace d'administration (LiveSettings) les remplacent.
+ */
+final class LiveConfig
+{
+    public function __construct(
+        public readonly string $youtube,
+        public readonly string $opensAt,
+        public readonly string $endsAt,
+        public readonly string $superCodeHash,
+    ) {
+    }
+}

@@ -1,0 +1,152 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Le direct · Podlab × Bénin Bouge{% endblock %}
+
+{% block meta %}
+    <meta name="robots" content="noindex, nofollow">
+{% endblock %}
+
+{% set heure_ouverture = opens_at|date("H\\hi", 'Africa/Porto-Novo') %}
+
+{% block body %}
+    <header class="container site-header">
+        <a href="{{ path('app_home') }}" class="brand" aria-label="Podlab × Bénin Bouge, retour au site">
+            <img src="{{ asset('images/logo-podlab.jpg') }}" alt="Podlab" class="brand__podlab">
+            <span class="brand__times" aria-hidden="true">×</span>
+            <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="brand__bb">
+        </a>
+        {% if etat in ['attente', 'direct'] and not is_super %}
+            <form method="post" action="{{ path('app_live_exit') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('live') }}">
+                <button type="submit" class="live__quit">Quitter</button>
+            </form>
+        {% endif %}
+    </header>
+
+    <main class="container live">
+        <p class="eyebrow">Édition spéciale en direct</p>
+        <h1 class="live__title">{{ title }}</h1>
+
+        {# ---------- Code d'accès ---------- #}
+        {% if etat == 'verrouille' %}
+            <section class="live__panel" aria-labelledby="live-code-title">
+                <h2 id="live-code-title" class="live__panel-title">Entrez le code de votre billet</h2>
+                <p class="live__panel-text">Vous l'avez reçu par e-mail avec votre billet. Un code ne fonctionne que sur un seul appareil à la fois.</p>
+
+                {% for message in app.flashes('live_error') %}
+                    <p class="live__error" role="alert">{{ message }}</p>
+                {% endfor %}
+
+                <form method="post" action="{{ path('app_live_access') }}" class="live__form">
+                    <input type="hidden" name="_token" value="{{ csrf_token('live') }}">
+                    <label class="live__label" for="live-code">Code du billet</label>
+                    <input id="live-code" name="code" type="text" class="live__input" placeholder="PL-XXXX-XXXX"
+                           autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+                    <button type="submit" class="btn btn--primary btn--lg btn--block">Accéder au direct</button>
+                </form>
+                <p class="live__hint-text">Le direct ouvre le {{ opens_label }} (heure du Bénin).</p>
+            </section>
+
+        {# ---------- Billet repris ailleurs ---------- #}
+        {% elseif etat == 'remplace' %}
+            <section class="live__panel">
+                <h2 class="live__panel-title">Ce billet est utilisé sur un autre appareil</h2>
+                <p class="live__panel-text">Un code ne peut suivre le direct que sur un appareil à la fois. Vous pouvez reprendre la main ici, l'autre appareil sera alors déconnecté.</p>
+                <form method="post" action="{{ path('app_live_resume') }}" class="live__form">
+                    <input type="hidden" name="_token" value="{{ csrf_token('live') }}">
+                    <button type="submit" class="btn btn--primary btn--lg btn--block">Reprendre ici</button>
+                </form>
+            </section>
+
+        {# ---------- Avant l'ouverture ---------- #}
+        {% elseif etat == 'attente' %}
+            <section class="live__panel" data-controller="reload-at" data-reload-at-at-value="{{ opens_at|date('c') }}">
+                <h2 class="live__panel-title">Bienvenue, votre billet est validé</h2>
+                <p class="live__panel-text">Le direct ouvre à <strong>{{ heure_ouverture }}</strong>. Gardez cette page ouverte&nbsp;: il démarrera tout seul.</p>
+                <div class="countdown live__countdown" data-controller="countdown" data-countdown-target-value="{{ opens_at|date('c') }}">
+                    <div data-countdown-target="running">
+                        <div class="countdown__grid" role="timer" aria-live="off">
+                            <div class="countdown__unit"><p class="countdown__value" data-countdown-target="days">00</p><p class="label">Jours</p></div>
+                            <div class="countdown__unit"><p class="countdown__value" data-countdown-target="hours">00</p><p class="label">Heures</p></div>
+                            <div class="countdown__unit"><p class="countdown__value" data-countdown-target="minutes">00</p><p class="label">Minutes</p></div>
+                            <div class="countdown__unit"><p class="countdown__value" data-countdown-target="seconds">00</p><p class="label">Secondes</p></div>
+                        </div>
+                    </div>
+                    <div data-countdown-target="ended" hidden>
+                        <p class="countdown__ended-title">C'est parti&nbsp;!</p>
+                    </div>
+                </div>
+            </section>
+
+        {# ---------- Direct ---------- #}
+        {% elseif etat == 'direct' %}
+            <div class="live__player"
+                 data-controller="live-player"
+                 data-live-player-flux-url-value="{{ path('app_live_flux') }}"
+                 data-live-player-ping-url-value="{{ path('app_live_ping') }}"
+                 data-live-player-csrf-value="{{ csrf_token('live') }}"
+                 data-live-player-ends-at-value="{{ ends_at|date('c') }}">
+                <div class="live__stage" data-live-player-target="stage">
+                    <div class="live__frame" data-live-player-target="frame"></div>
+                    {# Calque qui bloque tout clic sur la vidéo : pas de pause, de retour ni de lien YouTube #}
+                    <div class="live__shield" data-live-player-target="shield"></div>
+                    {% if watermark %}<p class="live__watermark" data-live-player-target="watermark" aria-hidden="true">{{ watermark }}</p>{% endif %}
+
+                    <div class="live__gate" data-live-player-target="gate">
+                        <p class="live__gate-text" data-live-player-target="status">Chargement du direct…</p>
+                        <button type="button" class="btn btn--primary btn--lg" data-live-player-target="join" data-action="live-player#join" disabled>Rejoindre le direct</button>
+                    </div>
+
+                    <div class="live__hint" data-live-player-target="hint" hidden>
+                        <span>En attente du début du direct…</span>
+                        <button type="button" class="live__hint-btn" data-action="live-player#retry">Relancer</button>
+                    </div>
+
+                    <div class="live__bar" data-live-player-target="bar" hidden>
+                        <span class="live__badge"><span class="live__dot" aria-hidden="true"></span>EN DIRECT</span>
+                        <div class="live__bar-right">
+                            <button type="button" class="live__icon" data-live-player-target="muteBtn" data-action="live-player#toggleMute" aria-label="Couper le son">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path data-live-player-target="waves" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+                            </button>
+                            <input type="range" min="0" max="100" value="100" class="live__volume" data-live-player-target="volume" data-action="input->live-player#setVolume" aria-label="Volume">
+                            <button type="button" class="live__icon" data-live-player-target="fsBtn" data-action="live-player#toggleFullscreen" aria-label="Plein écran">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    {# Panneaux affichés à la place de la vidéo #}
+                    <div class="live__blocked" data-live-player-target="usedPanel" hidden>
+                        <p class="live__panel-title">Ce billet est utilisé sur un autre appareil</p>
+                        <p class="live__panel-text">Un code ne peut suivre le direct que sur un appareil à la fois.</p>
+                        <form method="post" action="{{ path('app_live_resume') }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('live') }}">
+                            <button type="submit" class="btn btn--primary">Reprendre ici</button>
+                        </form>
+                    </div>
+                    <div class="live__blocked" data-live-player-target="endedPanel" hidden>
+                        <p class="live__panel-title">La diffusion est terminée</p>
+                        <p class="live__panel-text">Merci d'avoir été avec nous. Suivez Podlab et Bénin Bouge pour la suite.</p>
+                    </div>
+                </div>
+
+                <p class="live__note">C'est du direct&nbsp;: il n'est pas possible de mettre en pause ni de revenir en arrière. Votre code ne fonctionne que sur cet appareil.</p>
+            </div>
+
+        {# ---------- Accès fermé par l'administrateur ---------- #}
+        {% elseif etat == 'ferme' %}
+            <section class="live__panel">
+                <h2 class="live__panel-title">L'accès au direct est momentanément fermé</h2>
+                <p class="live__panel-text">Réessayez dans quelques instants ou contactez les organisateurs.</p>
+            </section>
+
+        {# ---------- Terminé ---------- #}
+        {% else %}
+            <section class="live__panel">
+                <h2 class="live__panel-title">La diffusion est terminée</h2>
+                <p class="live__panel-text">Merci d'avoir été avec nous. Suivez Podlab et Bénin Bouge pour la suite.</p>
+                <a href="{{ path('app_home') }}" class="btn btn--outline">Retour au site</a>
+            </section>
+        {% endif %}
+    </main>
+{% endblock %}

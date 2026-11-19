@@ -1,0 +1,43 @@
+{% extends 'admin/layout.html.twig' %}
+{% set active = 'dashboard' %}
+
+{% block admin_title %}Tableau de bord{% endblock %}
+
+{% block admin_content %}
+    <h1 class="adm-h1">Tableau de bord</h1>
+
+    <section class="adm-grid">
+        <article class="adm-card">
+            <p class="adm-card__label">Direct</p>
+            <p class="adm-card__big">
+                {% if not enabled %}Accès fermé{% elseif phase == 'avant' %}Pas encore ouvert{% elseif phase == 'ouvert' %}Ouvert{% else %}Terminé{% endif %}
+            </p>
+            <p class="adm-muted">
+                Du {{ opens_at|date('d/m/Y H:i', 'Africa/Porto-Novo') }} au {{ ends_at|date('d/m/Y H:i', 'Africa/Porto-Novo') }} (heure du Bénin)
+            </p>
+            {% if not enabled %}<p class="adm-alert adm-alert--error">L'interrupteur « accès ouvert » est désactivé : aucun billet ne donne accès.</p>{% endif %}
+            {% if not youtube_ok %}<p class="adm-alert adm-alert--error">Aucune vidéo YouTube n'est configurée. <a href="{{ path('app_admin_settings') }}">Renseigner le lien</a></p>{% endif %}
+        </article>
+
+        <article class="adm-card">
+            <p class="adm-card__label">Connectés maintenant</p>
+            <p class="adm-card__big">{{ stats.active }}</p>
+            <p class="adm-muted">Billets actifs dans les 90 dernières secondes</p>
+        </article>
+
+        <article class="adm-card">
+            <p class="adm-card__label">Codes utilisés</p>
+            <p class="adm-card__big">{{ stats.used }} <span class="adm-muted">/ {{ stats.total }}</span></p>
+            <p class="adm-muted">{{ stats.total - stats.used }} jamais utilisés · {{ stats.revoked }} révoqués</p>
+        </article>
+    </section>
+
+    <section class="adm-card">
+        <h2 class="adm-h2">Raccourcis</h2>
+        <p class="adm-actions">
+            <a class="adm-btn adm-btn--primary" href="{{ path('app_admin_codes') }}">Gérer les codes</a>
+            <a class="adm-btn" href="{{ path('app_admin_settings') }}">Modifier les paramètres</a>
+            <a class="adm-btn" href="{{ path('app_admin_codes_export') }}">Exporter les codes (CSV)</a>
+        </p>
+    </section>
+{% endblock %}

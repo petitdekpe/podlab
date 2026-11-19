@@ -21,3 +21,11 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    # Page /live : valeurs par défaut du direct (surchargées par l'espace /admin)
+    App\Live\LiveConfig:
+        arguments:
+            $youtube: '%env(string:LIVE_YOUTUBE_ID)%'
+            $opensAt: '%env(LIVE_OPENS_AT)%'
+            $endsAt: '%env(LIVE_ENDS_AT)%'
+            $superCodeHash: '%env(string:LIVE_SUPERCODE_HASH)%'
