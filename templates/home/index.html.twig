@@ -84,6 +84,29 @@
                 </div>
             </div>
 
+            {# Trailer : démarre quand il est visible, avec le son si le navigateur l'autorise #}
+            {# Quand on dépasse la vidéo en la lisant, le lecteur passe en miniature dans le coin de l'écran #}
+            <div class="trailer" data-controller="trailer">
+                <div class="trailer__player" data-trailer-target="player">
+                    <video class="trailer__video" data-trailer-target="video" data-action="click->trailer#toggleFromMini"
+                           src="{{ asset('videos/trailer.mp4') }}"
+                           poster="{{ asset('images/trailer-poster.jpg') }}"
+                           controls playsinline preload="metadata"
+                           aria-label="Bande-annonce : Edgar-Yves, Moi, à quatre pattes ?!"></video>
+                    <button type="button" class="trailer__unmute" data-trailer-target="unmute" data-action="trailer#unmute" hidden>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m22 9-6 6M16 9l6 6"/></svg>
+                        Activer le son
+                    </button>
+                    <button type="button" class="trailer__mini-btn trailer__expand" data-action="trailer#expand" aria-label="Revenir à la vidéo" title="Revenir à la vidéo">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                    </button>
+                    <button type="button" class="trailer__mini-btn trailer__close" data-action="trailer#close" aria-label="Fermer la miniature" title="Fermer">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <p class="trailer__placeholder" aria-hidden="true">La bande-annonce continue dans le coin de l'écran</p>
+            </div>
+
             {# Décompte #}
             <div class="countdown" data-controller="countdown" data-countdown-target-value="{{ debut_iso }}">
                 <div data-countdown-target="running" {{ decompte.ended ? 'hidden' }}>
