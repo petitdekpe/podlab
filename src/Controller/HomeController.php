@@ -20,6 +20,8 @@ final class HomeController extends AbstractController
     public function index(): Response
     {
         $debut = new \DateTimeImmutable(self::DEBUT_PROJECTION);
+        // De l'ouverture du direct à sa fin (réglables dans /admin), le site renvoie vers /live
+        $redirection = $finDirect = null;
 
         // Réglages modifiables dans /admin. Si la base est indisponible, la page
         // reste affichée avec les valeurs par défaut (salle complète, pas de billetterie du direct).
@@ -27,13 +29,30 @@ final class HomeController extends AbstractController
             $soldOut = $this->settings->soldOut();
             $liveTicketUrl = $this->settings->liveTicketUrl();
             $watermark = $this->settings->watermark();
+            $redirection = $this->settings->opensAt();
+            $finDirect = $this->settings->endsAt();
         } catch (\Throwable) {
             $watermark = true;
             $soldOut = true;
             $liveTicketUrl = $this->settings->defaultLiveTicketUrl(); // ne lit pas la base
         }
 
+        // Pendant le direct, le site mène directement à la page du direct.
+        // Après sa fin, on ne redirige plus (la page « terminé » renvoie vers le site).
+        $now = new \DateTimeImmutable();
+        $redirige = null !== $redirection && null !== $finDirect && $finDirect > $redirection;
+
+        if ($redirige && $now >= $redirection && $now < $finDirect) {
+            $response = $this->redirectToRoute('app_live');
+            $response->setPrivate();
+            $response->headers->addCacheControlDirective('no-store');
+
+            return $response;
+        }
+
         return $this->render('home/index.html.twig', [
+            // Les visiteurs déjà sur la page partent vers /live à l'heure dite
+            'redirection_direct' => $redirige && $now < $redirection ? $redirection : null,
             'debut_projection' => $debut,
             'decompte' => $this->decompte($debut),
             'prix_billet' => self::PRIX_BILLET,

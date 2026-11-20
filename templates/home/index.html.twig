@@ -45,6 +45,9 @@
 ] %}
 
 {% block body %}
+    {% if redirection_direct %}
+        <div hidden data-controller="reload-at" data-reload-at-at-value="{{ redirection_direct|date('c') }}" data-reload-at-url-value="{{ path('app_live') }}"></div>
+    {% endif %}
     {# ---------- En-tête ---------- #}
     <header class="container site-header">
         <a href="{{ path('app_home') }}" class="brand" aria-label="Podlab × Bénin Bouge">
