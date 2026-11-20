@@ -392,26 +392,6 @@ input:focus-visible {
     object-fit: contain;
 }
 
-.trailer__unmute {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    padding: 0 18px;
-    border: 0;
-    border-radius: 999px;
-    background: var(--color-accent);
-    color: var(--color-bg);
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-}
-.trailer__unmute:hover { background: var(--color-accent-hover); }
-.trailer__unmute:focus-visible { outline: 2px solid var(--color-text); outline-offset: 3px; }
-
 .trailer__mini-btn,
 .trailer__placeholder { display: none; }
 
@@ -461,18 +441,6 @@ input:focus-visible {
 .trailer.is-mini .trailer__mini-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .trailer.is-mini .trailer__expand { left: 8px; }
 .trailer.is-mini .trailer__close { right: 8px; }
-
-.trailer.is-mini .trailer__unmute {
-    top: auto;
-    right: auto;
-    bottom: 8px;
-    left: 8px;
-    min-height: 32px;
-    padding: 0 12px;
-    font-size: 12px;
-    gap: 6px;
-}
-.trailer.is-mini .trailer__unmute svg { width: 16px; height: 16px; }
 
 @keyframes trailer-pop {
     from { opacity: 0; transform: translateY(12px) scale(0.96); }
@@ -968,6 +936,19 @@ input:focus-visible {
 .partner__bb { height: 92px; width: auto; object-fit: contain; }
 .partner__sponsor { height: 110px; width: auto; align-self: flex-start; object-fit: contain; }
 
+.partner__logos--sponsors { gap: 20px 28px; }
+
+/* pastille blanche : le logo Tick Africa est conçu pour un fond clair */
+.partner__chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-radius: 14px;
+    background: #FFFFFF;
+}
+.partner__chip:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.partner__tick { display: block; height: 52px; width: auto; }
+
 /* ==========================================================================
    Footer
    ========================================================================== */
@@ -1026,7 +1007,6 @@ input:focus-visible {
     .fact__value { font-size: 17px; }
 
     .trailer { margin-top: 20px; border-radius: 14px; }
-    .trailer__unmute { top: 10px; right: 10px; min-height: 40px; padding: 0 14px; font-size: 14px; }
     .trailer.is-mini .trailer__player {
         width: 176px;
         right: 12px;
@@ -1077,6 +1057,8 @@ input:focus-visible {
 
     .partner { padding: 24px 20px; gap: 16px; }
     .partner__sponsor { height: 72px; }
+    .partner__chip { padding: 10px 16px; }
+    .partner__tick { height: 40px; }
 
     .site-footer { padding-top: 40px; padding-bottom: 104px; flex-direction: column; align-items: flex-start; }
 
@@ -1642,3 +1624,314 @@ input:focus-visible {
 
 .adm-search input[type="search"] { min-width: 280px; }
 @media (max-width: 760px) { .adm-search input[type="search"] { min-width: 0; flex: 1; } }
+/* ==========================================================================
+   « Sold out » sur la billetterie + fenêtre pop-up d'accès au direct
+   ========================================================================== */
+:root { --color-soldout: #FF6B5C; }
+
+.booking__embed { position: relative; }
+.booking__frame { min-width: 0; }
+
+.booking__embed.is-soldout { min-height: 340px; }
+
+/* le formulaire reste visible mais flouté, grisé et inactif */
+.booking__embed.is-soldout .booking__iframe {
+    filter: blur(5px) grayscale(1);
+    opacity: 0.45;
+    pointer-events: none;
+    user-select: none;
+}
+
+.soldout {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+    text-align: center;
+    border-radius: 14px;
+    background: rgba(11, 11, 11, 0.8);
+    color: var(--color-text);
+}
+
+.soldout__badge {
+    padding: 4px 22px;
+    border: 3px solid var(--color-soldout);
+    border-radius: 12px;
+    color: var(--color-soldout);
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    text-transform: uppercase;
+    transform: rotate(-4deg);
+}
+
+.soldout__text { font-size: 18px; font-weight: 600; }
+.soldout__sub { font-size: 14px; color: var(--color-text-muted); }
+
+.soldout-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 10px;
+    border: 1.5px solid var(--color-soldout);
+    border-radius: 999px;
+    color: var(--color-soldout);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+/* --- pop-up --- */
+html.is-modal-open { overflow: hidden; }
+
+.modal {
+    width: min(560px, calc(100vw - 24px));
+    max-height: min(92vh, 860px);
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 22px;
+    background: var(--color-surface);
+    color: var(--color-text);
+    color-scheme: dark; /* barre de défilement sombre */
+    overflow: auto;
+}
+
+.modal::backdrop {
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(4px);
+}
+
+.modal[open] { animation: modal-pop 0.22s ease; }
+
+@keyframes modal-pop {
+    from { opacity: 0; transform: translateY(16px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+
+.modal__box { position: relative; padding: 32px; }
+
+.modal__close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--color-surface-3);
+    color: var(--color-text);
+    cursor: pointer;
+}
+.modal__close:hover { background: var(--color-border-strong); }
+.modal__close:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+.modal__title {
+    padding-right: 48px;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+.modal__text { margin-top: 12px; color: var(--color-text-muted); }
+.modal__text strong { color: var(--color-text); }
+
+.modal__badge {
+    display: inline-block;
+    margin-bottom: 14px;
+    padding: 4px 18px;
+    border: 3px solid var(--color-soldout);
+    border-radius: 12px;
+    color: var(--color-soldout);
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 5vw, 2rem);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    text-transform: uppercase;
+    transform: rotate(-3deg);
+}
+
+.modal__embed {
+    margin-top: 20px;
+    padding: 12px;
+    border-radius: 14px;
+    background: var(--color-cream);
+}
+
+.modal__iframe {
+    display: block;
+    width: 100%;
+    border: 0;
+}
+
+.modal__note { margin-top: 16px; font-size: 14px; color: var(--color-text-subtle); }
+.modal__note a { color: var(--color-accent); }
+
+.modal__soon {
+    margin-top: 20px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    border: 1px dashed var(--color-border-strong);
+    color: var(--color-text-muted);
+}
+
+@media (max-width: 640px) {
+    .booking__embed.is-soldout { min-height: 300px; }
+    .modal__box { padding: 24px 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .modal[open] { animation: none; }
+}
+
+.adm-h2--section { margin-top: 12px; padding-top: 20px; border-top: 1px solid var(--color-border); }
+/* ==========================================================================
+   Parcours en étapes dans le pop-up (principe du direct, règles, avertissement)
+   ========================================================================== */
+.btn--quiet {
+    background: transparent;
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border-strong);
+    font-weight: 600;
+}
+.btn--quiet:hover { color: var(--color-text); background: var(--color-surface-3); }
+
+.step[hidden] { display: none; }
+
+.step__count {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding-right: 52px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+}
+
+.step__bar { display: inline-flex; gap: 4px; }
+.step__bar i {
+    display: block;
+    width: 28px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-border-strong);
+}
+.step__bar i.is-on { background: var(--color-accent); }
+
+.step .modal__title:focus { outline: none; }
+
+.step__actions {
+    margin-top: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.step__actions .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ligne du temps : avant / pendant / après */
+.timeline {
+    margin: 20px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.timeline__item {
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+}
+
+.timeline__item--live { border-color: var(--color-accent); }
+
+.timeline__when {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-text-subtle);
+}
+.timeline__item--live .timeline__when { color: var(--color-accent); }
+
+.timeline__what { margin-top: 4px; color: var(--color-text-muted); }
+.timeline__what strong { color: var(--color-text); }
+
+.step__list { margin-top: 18px; color: var(--color-text-muted); }
+.step__list strong { color: var(--color-text); }
+
+.step__warning {
+    margin-top: 18px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 107, 92, 0.6);
+    background: rgba(255, 107, 92, 0.1);
+    color: var(--color-text);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* case à cocher de validation */
+.step__check {
+    margin-top: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-bg);
+    cursor: pointer;
+    font-weight: 600;
+}
+.step__check:has(input:checked) { border-color: var(--color-accent); }
+.step__check input {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    margin-top: 2px;
+    accent-color: var(--color-accent);
+    cursor: pointer;
+}
+
+/* avertissement sur la page du direct */
+.live__legal {
+    margin-top: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 107, 92, 0.5);
+    background: rgba(255, 107, 92, 0.08);
+    font-size: 14px;
+    color: var(--color-text-muted);
+}
+.live__legal strong { color: var(--color-text); }
+
+@media (max-width: 640px) {
+    .step__actions .btn { flex: 1 1 100%; }
+}
+
+.modal__title--compact { font-size: clamp(1.35rem, 3.5vw, 1.75rem); }
+.modal__embed { margin-top: 14px; }

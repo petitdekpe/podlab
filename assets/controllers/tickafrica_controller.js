@@ -10,7 +10,8 @@ export default class extends Controller {
     connect() {
         this.onMessage = (e) => {
             if (e.source !== this.frameTarget.contentWindow) return;
-            if (e.data?.type === 'tickafrica:height') {
+            // un widget chargé dans un conteneur masqué peut annoncer une hauteur nulle : on l'ignore
+            if (e.data?.type === 'tickafrica:height' && Number(e.data.height) > 0) {
                 this.frameTarget.height = e.data.height;
             }
         };

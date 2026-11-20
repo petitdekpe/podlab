@@ -84,19 +84,21 @@
                 </div>
             </div>
 
-            {# Trailer : démarre quand il est visible, avec le son si le navigateur l'autorise #}
-            {# Quand on dépasse la vidéo en la lisant, le lecteur passe en miniature dans le coin de l'écran #}
+            {# Trailer : se lance au clic (aucun démarrage automatique). Si on dépasse la vidéo en cours de lecture,
+               le lecteur passe en miniature dans le coin de l'écran #}
             <div class="trailer" data-controller="trailer">
                 <div class="trailer__player" data-trailer-target="player">
-                    <video class="trailer__video" data-trailer-target="video" data-action="click->trailer#toggleFromMini"
-                           src="{{ asset('videos/trailer.mp4') }}"
-                           poster="{{ asset('images/trailer-poster.jpg') }}"
-                           controls playsinline preload="metadata"
-                           aria-label="Bande-annonce : Edgar-Yves, Moi, à quatre pattes ?!"></video>
-                    <button type="button" class="trailer__unmute" data-trailer-target="unmute" data-action="trailer#unmute" hidden>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m22 9-6 6M16 9l6 6"/></svg>
-                        Activer le son
-                    </button>
+                    <video
+                        class="trailer__video"
+                        data-trailer-target="video"
+                        data-action="click->trailer#toggleFromMini"
+                        src="{{ asset('videos/trailer.mp4') }}"
+                        poster="{{ asset('images/trailer-poster.jpg') }}"
+                        controls
+                        playsinline
+                        preload="metadata"
+                        aria-label="Bande-annonce : Edgar-Yves, Moi, à quatre pattes ?!"
+                    ></video>
                     <button type="button" class="trailer__mini-btn trailer__expand" data-action="trailer#expand" aria-label="Revenir à la vidéo" title="Revenir à la vidéo">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
                     </button>
@@ -137,11 +139,19 @@
             </div>
 
             <div class="hero__cta">
-                <a href="#reservation" class="btn btn--primary btn--lg">
-                    Je réserve ma place — {{ prix }}&nbsp;FCFA
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                </a>
-                <span class="hero__cta-note">Places limitées.</span>
+                {% if soldout %}
+                    <button type="button" class="btn btn--primary btn--lg" data-open-modal="live-tickets">
+                        Sold out · Suivre le direct en ligne
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </button>
+                    <span class="hero__cta-note">Toutes les places en salle sont vendues.</span>
+                {% else %}
+                    <a href="#reservation" class="btn btn--primary btn--lg">
+                        Je réserve ma place — {{ prix }}&nbsp;FCFA
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
+                    <span class="hero__cta-note">Places limitées.</span>
+                {% endif %}
             </div>
         </section>
 
@@ -259,11 +269,11 @@
                 <div>
                     <p class="eyebrow">Billet</p>
                     <h2 class="h2 u-mb-16">Votre place pour l'Édition Spéciale</h2>
-                    <p class="lead">Seulement [NOMBRE] places. Une fois la salle pleine, les réservations ferment.</p>
+                    <p class="lead">Seulement 75 places. Une fois la salle pleine, les réservations ferment.</p>
                 </div>
                 <div class="ticket">
                     <div class="ticket__head">
-                        <p class="ticket__kind">Billet unique</p>
+                        <p class="ticket__kind">Billet unique{% if soldout %} <span class="soldout-tag">Sold out</span>{% endif %}</p>
                         <p class="ticket__date">Dim. 22 nov. · 13h00</p>
                     </div>
                     <p class="ticket__price">{{ prix }} <span class="ticket__currency">FCFA</span></p>
@@ -272,7 +282,11 @@
                         <li>2 heures d'histoires inédites avec Edgar-Yves et Beni Tossou</li>
                         <li>Dimanche 22 novembre, 13h00 précises</li>
                     </ul>
-                    <a href="#reservation" class="btn btn--primary btn--lg btn--block">Je réserve ma place</a>
+                    {% if soldout %}
+                        <button type="button" class="btn btn--primary btn--lg btn--block" data-open-modal="live-tickets">Accès au direct, le même jour</button>
+                    {% else %}
+                        <a href="#reservation" class="btn btn--primary btn--lg btn--block">Je réserve ma place</a>
+                    {% endif %}
                 </div>
             </div>
         </section>
@@ -282,13 +296,18 @@
             <div class="split booking">
                 <div>
                     <p class="eyebrow">Réservation</p>
-                    <h2 class="booking__title">Réservez en 2&nbsp;minutes</h2>
-                    <ol class="steps">
-                        <li>Choisissez votre billet.</li>
-                        <li>Payez en ligne.</li>
-                        <li>Recevez votre billet par e-mail et montrez-le à l'entrée.</li>
-                    </ol>
-                    <p class="booking__note">La salle se remplit. Ne soyez pas celui qui l'a vu sur les réseaux après tout le monde.</p>
+                    {% if soldout %}
+                        <h2 class="booking__title">Salle complète</h2>
+                        <p class="booking__note">Toutes les places en salle sont vendues. Le même jour, suivez l'événement en direct, depuis chez vous.</p>
+                    {% else %}
+                        <h2 class="booking__title">Réservez en 2&nbsp;minutes</h2>
+                        <ol class="steps">
+                            <li>Choisissez votre billet.</li>
+                            <li>Payez en ligne.</li>
+                            <li>Recevez votre billet par e-mail et montrez-le à l'entrée.</li>
+                        </ol>
+                        <p class="booking__note">La salle se remplit. Ne soyez pas celui qui l'a vu sur les réseaux après tout le monde.</p>
+                    {% endif %}
                     <div data-controller="countdown" data-countdown-target-value="{{ debut_iso }}">
                         <p class="booking__countdown" data-countdown-target="running" {{ decompte.ended ? 'hidden' }}>
                             Projection dans
@@ -298,15 +317,27 @@
                 </div>
 
                 {# Billetterie tick.africa : la couleur primaire reprend l'accent du site (#F5B82E) #}
-                <div class="booking__embed" data-controller="tickafrica">
-                    <iframe
-                        src="https://tick.africa/embed/podlab-au-cinema?primary=F5B82E"
-                        title="Billetterie Podlab au Cinéma"
-                        class="booking__iframe"
-                        height="120"
-                        loading="lazy"
-                        data-tickafrica-target="frame"
-                    ></iframe>
+                <div class="booking__embed{{ soldout ? ' is-soldout' }}" data-controller="tickafrica">
+                    {# Complet : le formulaire reste visible, flouté et inactif, sous le filtre « Sold out » #}
+                    <div class="booking__frame"{% if soldout %} inert aria-hidden="true"{% endif %}>
+                        <iframe
+                            src="https://tick.africa/embed/podlab-au-cinema?primary=F5B82E"
+                            title="Billetterie Podlab au Cinéma"
+                            class="booking__iframe"
+                            height="120"
+                            loading="lazy"
+                            data-tickafrica-target="frame"
+                        ></iframe>
+                    </div>
+
+                    {% if soldout %}
+                        <div class="soldout" role="region" aria-label="Billetterie en salle complète">
+                            <p class="soldout__badge">Sold out</p>
+                            <p class="soldout__text">Toutes les places en salle sont vendues.</p>
+                            <button type="button" class="btn btn--primary" data-open-modal="live-tickets">Acheter un accès au direct</button>
+                            <p class="soldout__sub">Le même jour, en ligne, depuis chez vous.</p>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </section>
@@ -323,8 +354,14 @@
                     </div>
                 </div>
                 <div class="partner card">
-                    <p class="eyebrow">Sponsor officiel</p>
-                    <img src="{{ asset('images/logo-majestic-benin.webp') }}" alt="Majestic Bénin" class="partner__sponsor" loading="lazy">
+                    <p class="eyebrow">Sponsors officiels</p>
+                    <div class="partner__logos partner__logos--sponsors">
+                        <img src="{{ asset('images/logo-majestic-benin.webp') }}" alt="Majestic Bénin" class="partner__sponsor" loading="lazy">
+                        {# Logo sur fond clair : posé dans une pastille blanche pour rester lisible sur le fond sombre #}
+                        <a href="https://tick.africa" target="_blank" rel="noopener" class="partner__chip" aria-label="Tick Africa, billetterie officielle (nouvel onglet)">
+                            <img src="{{ asset('images/logo-tickafrica.png') }}" alt="Tick Africa" class="partner__tick" loading="lazy">
+                        </a>
+                    </div>
                 </div>
             </div>
         </section>
@@ -332,15 +369,144 @@
 
     {# Barre d'action collante (mobile) : visible une fois le hero passé, masquée près de la billetterie #}
     <div class="sticky-cta" data-controller="sticky-cta" data-sticky-cta-watch-value='[".hero__cta", "#reservation"]'>
-        <a href="#reservation" class="btn btn--primary">Réserver · {{ prix }}&nbsp;FCFA</a>
+        {% if soldout %}
+            <button type="button" class="btn btn--primary" data-open-modal="live-tickets">Sold out · Suivre le direct</button>
+        {% else %}
+            <a href="#reservation" class="btn btn--primary">Réserver · {{ prix }}&nbsp;FCFA</a>
+        {% endif %}
     </div>
+
+    {# ---------- Pop-up : annonce du Sold out + principe du direct (3 validations) + achat ----------
+         S'ouvre toute seule à l'arrivée sur la page (une fois par visite) quand la salle est complète,
+         et à chaque clic sur un bouton data-open-modal="live-tickets".
+         Parcours : annonce → 1. principe → 2. règles → 3. engagement → achat (formulaire Tickafrica). #}
+    <dialog
+        class="modal"
+        data-controller="modal steps"
+        data-modal-id-value="live-tickets"
+        data-modal-auto-open-value="{{ soldout ? 'true' : 'false' }}"
+        data-modal-once-key-value="soldout-announcement"
+        data-steps-storage-key-value="live-purchase-steps"
+        data-action="click->modal#backdrop close->modal#closed close->steps#reset change->steps#sync"
+        aria-labelledby="live-tickets-title"
+    >
+        <div class="modal__box">
+            <button type="button" class="modal__close" data-action="modal#close" aria-label="Fermer la fenêtre">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+
+            {# ===== Annonce ===== #}
+            <section class="step" data-steps-target="panel">
+                {% if soldout %}<p class="modal__badge">Sold out</p>{% endif %}
+                <p class="eyebrow">{{ soldout ? 'Salle complète' : 'Accès au direct' }}</p>
+                <h2 id="live-tickets-title" class="modal__title" tabindex="-1">{{ soldout ? 'Toutes les places en salle sont vendues' : 'Suivez l\'événement en direct' }}</h2>
+                <p class="modal__text">
+                    {% if soldout %}
+                        Mais vous pouvez vivre « Moi, à quatre pattes&nbsp;?! » en direct, depuis chez vous&nbsp;: <strong>l'accès au direct est en vente</strong>, le dimanche 22 novembre 2026, <strong>aux mêmes heures que la projection (13h00 – 15h00, heure du Bénin)</strong>.
+                    {% else %}
+                        Vivez « Moi, à quatre pattes&nbsp;?! » en direct, depuis chez vous, le dimanche 22 novembre 2026 de 13h00 à 15h00 (heure du Bénin).
+                    {% endif %}
+                </p>
+                <p class="modal__text">Avant d'acheter, prenez une minute pour comprendre comment fonctionne le direct&nbsp;: trois courtes étapes.</p>
+                <div class="step__actions">
+                    <button type="button" class="btn btn--primary" data-action="steps#start">Acheter un accès au direct</button>
+                    <button type="button" class="btn btn--quiet" data-action="modal#close">Plus tard</button>
+                </div>
+            </section>
+
+            {# ===== Étape 1 : le principe ===== #}
+            <section class="step" data-steps-target="panel" hidden>
+                <p class="step__count">Étape 1 sur 3 <span class="step__bar" aria-hidden="true"><i class="is-on"></i><i></i><i></i></span></p>
+                <h2 class="modal__title" tabindex="-1">Le principe&nbsp;: un direct, à heure fixe</h2>
+                <ol class="timeline">
+                    <li class="timeline__item">
+                        <p class="timeline__when">Avant le direct</p>
+                        <p class="timeline__what">Il n'y a rien à voir. Si vous arrivez avant l'heure, un décompte vous attend.</p>
+                    </li>
+                    <li class="timeline__item timeline__item--live">
+                        <p class="timeline__when">Pendant le direct · 13h00 – 15h00</p>
+                        <p class="timeline__what">Vous rejoignez le direct <strong>là où nous en sommes</strong>. Ce qui s'est passé avant votre arrivée, vous ne le rattrapez pas.</p>
+                    </li>
+                    <li class="timeline__item">
+                        <p class="timeline__when">Après le direct</p>
+                        <p class="timeline__what"><strong>C'est fini.</strong> Il n'y a ni rediffusion ni replay : la page ne donne plus accès à la vidéo.</p>
+                    </li>
+                </ol>
+                <div class="step__actions">
+                    <button type="button" class="btn btn--quiet" data-action="steps#back">Retour</button>
+                    <button type="button" class="btn btn--primary" data-action="steps#next">Continuer</button>
+                </div>
+            </section>
+
+            {# ===== Étape 2 : les règles ===== #}
+            <section class="step" data-steps-target="panel" hidden>
+                <p class="step__count">Étape 2 sur 3 <span class="step__bar" aria-hidden="true"><i class="is-on"></i><i class="is-on"></i><i></i></span></p>
+                <h2 class="modal__title" tabindex="-1">Les règles du direct</h2>
+                <ul class="bullets step__list">
+                    <li><strong>Pas de pause, pas de retour en arrière.</strong> Le lecteur ne propose que le volume et le plein écran.</li>
+                    <li><strong>Pas de rediffusion.</strong> Une fois le direct terminé, la vidéo n'est plus accessible.</li>
+                    <li><strong>Un code, un appareil à la fois.</strong> Si vous vous connectez ailleurs avec le même code, le premier appareil est déconnecté.</li>
+                    <li><strong>Prévoyez une bonne connexion</strong> (Wi-Fi ou 4G). Si elle coupe, vous reprenez le direct là où il en est.</li>
+                    <li>Votre code d'accès vous est envoyé avec votre billet. Le jour J, saisissez-le sur la page du direct.</li>
+                </ul>
+                <div class="step__actions">
+                    <button type="button" class="btn btn--quiet" data-action="steps#back">Retour</button>
+                    <button type="button" class="btn btn--primary" data-action="steps#next">Continuer</button>
+                </div>
+            </section>
+
+            {# ===== Étape 3 : avertissement ===== #}
+            <section class="step" data-steps-target="panel" hidden>
+                <p class="step__count">Étape 3 sur 3 <span class="step__bar" aria-hidden="true"><i class="is-on"></i><i class="is-on"></i><i class="is-on"></i></span></p>
+                <h2 class="modal__title" tabindex="-1">Avertissement&nbsp;: ce direct est protégé</h2>
+                <div class="step__warning" role="note">
+                    <p><strong>Toute capture d'écran, tout enregistrement, toute copie ou diffusion du direct est strictement interdit</strong>, en tout ou en partie, y compris sur les réseaux sociaux ou les messageries.</p>
+                    {% if watermark %}<p>Chaque accès est identifié&nbsp;: le numéro de votre billet s'affiche sur la vidéo. Toute fuite peut être retracée jusqu'à votre billet.</p>{% endif %}
+                    <p><strong>Toute personne qui enregistre ou diffuse le direct s'expose à des poursuites judiciaires.</strong></p>
+                </div>
+                <label class="step__check">
+                    <input type="checkbox" data-steps-target="check">
+                    <span>J'ai compris le principe et les règles du direct (avant, rien&nbsp;; pendant, je rejoins là où ils en sont&nbsp;; après, c'est fini). Je m'engage à ne pas capturer, enregistrer ni diffuser le direct, et je suis conscient(e) des poursuites judiciaires encourues.</span>
+                </label>
+                <div class="step__actions">
+                    <button type="button" class="btn btn--quiet" data-action="steps#back">Retour</button>
+                    <button type="button" class="btn btn--primary" data-steps-target="next" data-action="steps#next" disabled>Valider et passer à l'achat</button>
+                </div>
+            </section>
+
+            {# ===== Achat ===== #}
+            <section class="step" data-steps-target="panel" hidden>
+                <p class="eyebrow">Paiement · dimanche 22 novembre, 13h00 – 15h00</p>
+                <h2 class="modal__title modal__title--compact" tabindex="-1">Achetez votre accès au direct</h2>
+
+                {% if live_ticket_url %}
+                    <div class="modal__embed" data-controller="tickafrica">
+                        <iframe
+                            data-lazy-src="{{ live_ticket_url }}"
+                            title="Billetterie des accès au direct"
+                            class="modal__iframe"
+                            height="120"
+                            data-tickafrica-target="frame"
+                        ></iframe>
+                    </div>
+                    <p class="modal__note">Votre code d'accès au direct vous est envoyé avec votre billet. Le jour J, saisissez-le sur <a href="{{ path('app_live') }}">la page du direct</a> : un code ne fonctionne que sur un appareil à la fois.</p>
+                {% else %}
+                    <p class="modal__soon">La billetterie des accès au direct ouvre très bientôt. Revenez sur cette page ou suivez Podlab et Bénin Bouge pour l'annonce.</p>
+                {% endif %}
+
+                <div class="step__actions">
+                    <button type="button" class="btn btn--quiet" data-action="steps#back">Relire les règles</button>
+                </div>
+            </section>
+        </div>
+    </dialog>
 
     {# ---------- Footer ---------- #}
     <footer class="container site-footer">
         <div class="site-footer__brand">
             <img src="{{ asset('images/logo-podlab.jpg') }}" alt="Podlab" class="site-footer__podlab" loading="lazy">
             <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="site-footer__bb" loading="lazy">
-            <span>Une Édition Spéciale Podlab × Bénin Bouge, en partenariat avec Majestic Bénin, sponsor officiel.</span>
+            <span>Une Édition Spéciale Podlab × Bénin Bouge, en partenariat avec Majestic Bénin et Tick Africa, sponsors officiels.</span>
         </div>
         <span>Une question&nbsp;? Écrivez-nous sur WhatsApp au 0166617878 ou à contact@beninbouge.com.
     </footer>

@@ -122,6 +122,8 @@ final class AdminController extends AbstractController
             'ends_at' => $this->settings->endsAt()->setTimezone($tz)->format('Y-m-d\TH:i'),
             'enabled' => $this->settings->enabled(),
             'watermark' => $this->settings->watermark(),
+            'soldout' => $this->settings->soldOut(),
+            'live_ticket_url' => (string) $this->settings->get('live_ticket_url'),
         ];
 
         if ($request->isMethod('POST')) {
@@ -135,6 +137,8 @@ final class AdminController extends AbstractController
                     'ends_at' => (string) $request->request->get('ends_at'),
                     'enabled' => $request->request->getBoolean('enabled'),
                     'watermark' => $request->request->getBoolean('watermark'),
+                    'soldout' => $request->request->getBoolean('soldout'),
+                    'live_ticket_url' => trim((string) $request->request->get('live_ticket_url')),
                 ];
 
                 $opens = $this->parseLocal($form['opens_at'], $tz);
@@ -145,6 +149,9 @@ final class AdminController extends AbstractController
                 }
                 if ('' !== $form['youtube'] && '' === LiveSettings::extractVideoId($form['youtube'])) {
                     $errors[] = 'Le lien ou l\'identifiant YouTube n\'est pas reconnu (attendu : lien youtube.com/watch?v=…, youtu.be/… ou identifiant de 11 caractères).';
+                }
+                if ('' !== $form['live_ticket_url'] && '' === LiveSettings::normalizeEmbedUrl($form['live_ticket_url'])) {
+                    $errors[] = 'Le lien de la billetterie du direct doit être une adresse complète commençant par https://.';
                 }
                 if (null === $opens || null === $ends) {
                     $errors[] = 'Les dates d\'ouverture et de fin sont obligatoires.';
@@ -159,6 +166,8 @@ final class AdminController extends AbstractController
                     $this->settings->set('ends_at', $ends->format('c'));
                     $this->settings->set('enabled', $form['enabled'] ? '1' : '0');
                     $this->settings->set('watermark', $form['watermark'] ? '1' : '0');
+                    $this->settings->set('soldout', $form['soldout'] ? '1' : '0');
+                    $this->settings->set('live_ticket_url', '' === $form['live_ticket_url'] ? null : $form['live_ticket_url']);
                     $this->addFlash('admin_ok', 'Paramètres enregistrés.');
 
                     return $this->redirectToRoute('app_admin_settings');
@@ -170,6 +179,7 @@ final class AdminController extends AbstractController
             'form' => $form,
             'errors' => $errors,
             'timezone' => LiveSettings::TIMEZONE,
+            'live_ticket_default' => $this->settings->defaultLiveTicketUrl(),
         ]));
     }
 

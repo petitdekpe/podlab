@@ -13,6 +13,8 @@ final class LiveConfig
         public readonly string $opensAt,
         public readonly string $endsAt,
         public readonly string $superCodeHash,
+        /** Billetterie Tickafrica des accès au direct (pop-up du site) */
+        public readonly string $liveTicketUrl,
     ) {
     }
 }

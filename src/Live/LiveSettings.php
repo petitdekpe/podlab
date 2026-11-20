@@ -56,6 +56,47 @@ final class LiveSettings
         return '0' !== $this->get('watermark');
     }
 
+    /** Billetterie en salle complète (filtre « Sold out » sur le site). Par défaut : oui. */
+    public function soldOut(): bool
+    {
+        return '0' !== $this->get('soldout');
+    }
+
+    /** Lien de la billetterie des accès au direct (affichée dans la fenêtre pop-up), ou '' s'il n'est pas défini. */
+    public function liveTicketUrl(): string
+    {
+        $url = self::normalizeEmbedUrl((string) $this->get('live_ticket_url'));
+
+        return '' !== $url ? $url : $this->defaultLiveTicketUrl();
+    }
+
+    /** Lien par défaut (variable LIVE_TICKETS_URL), utilisé tant qu'aucun lien n'est saisi dans l'administration. */
+    public function defaultLiveTicketUrl(): string
+    {
+        return self::normalizeEmbedUrl($this->defaults->liveTicketUrl);
+    }
+
+    /**
+     * N'accepte qu'un lien https. Pour Tickafrica, la couleur principale du site
+     * est ajoutée si elle n'est pas déjà dans le lien. Retourne '' si invalide.
+     */
+    public static function normalizeEmbedUrl(string $url): string
+    {
+        $url = trim($url);
+        $parts = parse_url($url);
+
+        if ('' === $url || false === $parts || ($parts['scheme'] ?? '') !== 'https' || empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
+            return '';
+        }
+
+        $host = strtolower($parts['host']);
+        if (('tick.africa' === $host || str_ends_with($host, '.tick.africa')) && !str_contains($parts['query'] ?? '', 'primary=')) {
+            $url .= (isset($parts['query']) ? '&' : '?').'primary=F5B82E';
+        }
+
+        return $url;
+    }
+
     /** Empreinte du supercode : celle de l'administration, sinon celle de l'environnement. */
     public function superHash(): string
     {

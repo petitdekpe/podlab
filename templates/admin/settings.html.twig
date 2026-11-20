@@ -42,6 +42,20 @@
             <span><strong>Filigrane avec le numéro du billet</strong><br><span class="adm-muted">Un texte discret se déplace sur la vidéo : il permet de retrouver l'origine d'un enregistrement partagé.</span></span>
         </label>
 
+        <h2 class="adm-h2 adm-h2--section">Billetterie du site</h2>
+
+        <label class="adm-check">
+            <input type="checkbox" name="soldout" value="1"{{ form.soldout ? ' checked' }}>
+            <span><strong>Billetterie en salle « Sold out »</strong><br><span class="adm-muted">Affiche un filtre « Sold out » sur la billetterie du site. Les boutons « Réserver » ouvrent alors la fenêtre d'achat d'un accès au direct. Décochez pour rouvrir la billetterie en salle.</span></span>
+        </label>
+
+        <label class="adm-label" for="live_ticket_url">Billetterie des accès au direct (Tickafrica)</label>
+        <input id="live_ticket_url" name="live_ticket_url" type="url" class="adm-input" value="{{ form.live_ticket_url }}" placeholder="{{ live_ticket_default ?: 'https://tick.africa/embed/…' }}" autocomplete="off" spellcheck="false">
+        <p class="adm-help">
+            Lien d'intégration (embed) Tickafrica de l'événement « accès au direct », affiché dans la fenêtre pop-up.
+            {% if live_ticket_default %}Laissé vide, c'est le lien par défaut du site qui est utilisé : <code>{{ live_ticket_default }}</code>{% else %}Tant qu'il est vide, la fenêtre indique que la billetterie ouvre bientôt.{% endif %}
+        </p>
+
         <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary">Enregistrer</button></p>
     </form>
 

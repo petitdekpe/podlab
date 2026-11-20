@@ -29,3 +29,4 @@ services:
             $opensAt: '%env(LIVE_OPENS_AT)%'
             $endsAt: '%env(LIVE_ENDS_AT)%'
             $superCodeHash: '%env(string:LIVE_SUPERCODE_HASH)%'
+            $liveTicketUrl: '%env(string:LIVE_TICKETS_URL)%'
