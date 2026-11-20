@@ -15,6 +15,8 @@ final class LiveConfig
         public readonly string $superCodeHash,
         /** Billetterie Tickafrica des accès au direct (pop-up du site) */
         public readonly string $liveTicketUrl,
+        /** Identifiant (UUID) de l'événement Tick Africa « accès au direct » */
+        public readonly string $tickafricaEventId = '',
     ) {
     }
 }

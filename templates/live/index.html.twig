@@ -31,7 +31,7 @@
         {% if etat == 'verrouille' %}
             <section class="live__panel" aria-labelledby="live-code-title">
                 <h2 id="live-code-title" class="live__panel-title">Entrez le code de votre billet</h2>
-                <p class="live__panel-text">Vous l'avez reçu par e-mail avec votre billet. Un code ne fonctionne que sur un seul appareil à la fois.</p>
+                <p class="live__panel-text">C'est le code imprimé sous le QR de votre billet Tick Africa, reçu par e-mail. Recopiez-le en respectant les majuscules et les minuscules. Un code ne fonctionne que sur un seul appareil à la fois.</p>
 
                 {% for message in app.flashes('live_error') %}
                     <p class="live__error" role="alert">{{ message }}</p>
@@ -40,8 +40,8 @@
                 <form method="post" action="{{ path('app_live_access') }}" class="live__form">
                     <input type="hidden" name="_token" value="{{ csrf_token('live') }}">
                     <label class="live__label" for="live-code">Code du billet</label>
-                    <input id="live-code" name="code" type="text" class="live__input" placeholder="PL-XXXX-XXXX"
-                           autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+                    <input id="live-code" name="code" type="text" class="live__input" placeholder="Ex. kR4mNpQ2"
+                           autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="200" required>
                     <button type="submit" class="btn btn--primary btn--lg btn--block">Accéder au direct</button>
                 </form>
                 <p class="live__hint-text">Le direct ouvre le {{ opens_label }} (heure du Bénin). Avant, il n'y a rien à voir&nbsp;; après sa fin, c'est terminé.</p>

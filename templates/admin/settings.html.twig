@@ -42,6 +42,20 @@
             <span><strong>Filigrane avec le numéro du billet</strong><br><span class="adm-muted">Un texte discret se déplace sur la vidéo : il permet de retrouver l'origine d'un enregistrement partagé.</span></span>
         </label>
 
+        <h2 class="adm-h2 adm-h2--section">Billets Tick Africa</h2>
+
+        <label class="adm-label" for="tickafrica_event_id">Identifiant de l'événement « accès au direct »</label>
+        <input id="tickafrica_event_id" name="tickafrica_event_id" type="text" class="adm-input" value="{{ form.tickafrica_event_id }}" placeholder="{{ tickafrica_event_default ?: '9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d' }}" autocomplete="off" spellcheck="false">
+        <p class="adm-help">
+            UUID de l'événement Tick Africa dont les billets ouvrent le direct. Les billets d'un autre événement (la salle, par exemple) sont refusés et ne sont pas consommés.
+            Pour le trouver : <code>php bin/console app:tickafrica:events</code>.
+            {% if tickafrica_event_default %}Laissé vide, c'est la valeur par défaut du site qui est utilisée : <code>{{ tickafrica_event_default }}</code>{% else %}Tant qu'il est vide, aucun nouveau billet n'est accepté.{% endif %}
+        </p>
+        <p class="adm-help">
+            Clé API (variable TICKAFRICA_API_KEY, fichier .env.local du serveur) :
+            {% if not tickafrica_key %}<strong>absente</strong>.{% elseif tickafrica_test %}<strong>clé de test</strong> (seuls les billets de test sont acceptés).{% else %}configurée (production).{% endif %}
+        </p>
+
         <h2 class="adm-h2 adm-h2--section">Billetterie du site</h2>
 
         <label class="adm-check">

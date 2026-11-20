@@ -97,6 +97,27 @@ final class LiveSettings
         return $url;
     }
 
+    /** UUID de l'événement Tick Africa du direct (administration, sinon TICKAFRICA_EVENT_ID), ou ''. */
+    public function tickafricaEventId(): string
+    {
+        $id = self::normalizeUuid((string) $this->get('tickafrica_event_id'));
+
+        return '' !== $id ? $id : self::normalizeUuid($this->tickafricaEventIdDefault());
+    }
+
+    /** Valeur par défaut (variable TICKAFRICA_EVENT_ID). */
+    public function tickafricaEventIdDefault(): string
+    {
+        return $this->defaults->tickafricaEventId;
+    }
+
+    public static function normalizeUuid(string $value): string
+    {
+        $value = strtolower(trim($value));
+
+        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $value) ? $value : '';
+    }
+
     /** Empreinte du supercode : celle de l'administration, sinon celle de l'environnement. */
     public function superHash(): string
     {

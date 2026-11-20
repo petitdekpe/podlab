@@ -1,33 +1,23 @@
 {% extends 'admin/layout.html.twig' %}
-{% import _self as m %}
 {% set active = 'codes' %}
 
-{% macro fmt(c) %}{{ c|slice(0, 2) }}-{{ c|slice(2, 4) }}-{{ c|slice(6) }}{% endmacro %}
-
-{% block admin_title %}Codes{% endblock %}
+{% block admin_title %}Billets{% endblock %}
 
 {% block admin_content %}
-    <h1 class="adm-h1">Codes d'accès <span class="adm-muted">({{ total }})</span></h1>
+    <h1 class="adm-h1">Billets validés <span class="adm-muted">({{ total }})</span></h1>
+    <p class="adm-muted">Les billets Tick Africa apparaissent ici à leur première saisie sur la page du direct, une fois validés par Tick Africa (leur entrée y est alors enregistrée). Révoquer un billet ne bloque l'accès que sur ce site.</p>
 
     <section class="adm-card adm-toolbar">
         <form method="get" class="adm-search">
             <label class="adm-sr" for="q">Rechercher</label>
-            <input id="q" name="q" type="search" class="adm-input" value="{{ q }}" placeholder="Rechercher un code ou un libellé">
+            <input id="q" name="q" type="search" class="adm-input" value="{{ q }}" placeholder="Rechercher un code ou un porteur">
             <label class="adm-sr" for="statut">Statut</label>
             <select id="statut" name="statut" class="adm-input">
                 <option value="all"{{ status == 'all' ? ' selected' }}>Tous</option>
-                <option value="unused"{{ status == 'unused' ? ' selected' }}>Jamais utilisés</option>
-                <option value="used"{{ status == 'used' ? ' selected' }}>Utilisés</option>
+                <option value="used"{{ status == 'used' ? ' selected' }}>Actifs</option>
                 <option value="revoked"{{ status == 'revoked' ? ' selected' }}>Révoqués</option>
             </select>
             <button type="submit" class="adm-btn">Filtrer</button>
-        </form>
-
-        <form method="post" action="{{ path('app_admin_codes_generate') }}" class="adm-search">
-            <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
-            <label class="adm-sr" for="count">Nombre de codes à ajouter</label>
-            <input id="count" name="count" type="number" min="1" max="{{ max_generate }}" value="10" class="adm-input adm-input--small">
-            <button type="submit" class="adm-btn adm-btn--primary">Générer</button>
         </form>
 
         <a class="adm-btn" href="{{ path('app_admin_codes_export') }}">Exporter (CSV)</a>
@@ -38,7 +28,7 @@
             <thead>
                 <tr>
                     <th scope="col">Code</th>
-                    <th scope="col">Libellé</th>
+                    <th scope="col">Porteur · billet</th>
                     <th scope="col">Statut</th>
                     <th scope="col">1ʳᵉ connexion</th>
                     <th scope="col">Dernière activité</th>
@@ -48,21 +38,20 @@
             <tbody>
                 {% for code in items %}
                     <tr class="{{ code.revoked ? 'is-revoked' }}">
-                        <td data-label="Code"><code class="adm-code">{{ m.fmt(code.code) }}</code></td>
-                        <td data-label="Libellé">
+                        <td data-label="Code"><code class="adm-code">{{ code.code }}</code></td>
+                        <td data-label="Porteur · billet">
                             <form method="post" action="{{ path('app_admin_code_label', {id: code.id}) }}" class="adm-inline">
                                 <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
                                 <input type="hidden" name="back" value="{{ back }}">
-                                <label class="adm-sr" for="label-{{ code.id }}">Libellé du code {{ m.fmt(code.code) }}</label>
-                                <input id="label-{{ code.id }}" name="label" type="text" class="adm-input adm-input--inline" maxlength="160" value="{{ code.label }}" placeholder="Nom, référence Tickafrica…">
+                                <label class="adm-sr" for="label-{{ code.id }}">Libellé du billet {{ code.code }}</label>
+                                <input id="label-{{ code.id }}" name="label" type="text" class="adm-input adm-input--inline" maxlength="160" value="{{ code.label }}" placeholder="Nom du porteur…">
                                 <button type="submit" class="adm-btn adm-btn--small">OK</button>
                             </form>
                         </td>
                         <td data-label="Statut">
                             {% if code.revoked %}<span class="adm-tag adm-tag--bad">Révoqué</span>
-                            {% elseif code.firstUsedAt is null %}<span class="adm-tag">Jamais utilisé</span>
-                            {% elseif code.claimToken %}<span class="adm-tag adm-tag--ok">Utilisé · connecté</span>
-                            {% else %}<span class="adm-tag adm-tag--ok">Utilisé</span>{% endif %}
+                            {% elseif code.claimToken %}<span class="adm-tag adm-tag--ok">Connecté</span>
+                            {% else %}<span class="adm-tag">Actif</span>{% endif %}
                         </td>
                         <td data-label="1ʳᵉ connexion">{{ code.firstUsedAt ? code.firstUsedAt|date('d/m H:i', 'Africa/Porto-Novo') : '—' }}</td>
                         <td data-label="Dernière activité">{{ code.lastSeenAt ? code.lastSeenAt|date('d/m H:i', 'Africa/Porto-Novo') : '—' }}</td>
@@ -82,7 +71,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="6" class="adm-empty">Aucun code ne correspond.</td></tr>
+                    <tr><td colspan="6" class="adm-empty">Aucun billet ne correspond.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

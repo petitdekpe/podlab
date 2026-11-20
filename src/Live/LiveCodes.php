@@ -7,102 +7,82 @@ use App\Repository\LiveCodeRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Codes d'accès (un par billet), stockés en base de données.
+ * Billets d'accès au direct, délivrés par Tick Africa.
+ *
+ * À sa première saisie, un code est validé auprès de Tick Africa (l'entrée y est
+ * enregistrée, le billet est donc consommé), puis conservé ici : les connexions
+ * suivantes, depuis cet appareil ou un autre, ne refont pas d'appel.
  */
 final class LiveCodes
 {
-    // Sans 0/O ni 1/I/L pour éviter les erreurs de saisie
-    public const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-    private const PREFIX = 'PL';
+    /** Codes de billet, ou contenu de QR "CODE:signature" */
+    private const INPUT_PATTERN = '/^[A-Za-z0-9:_+\/=.-]{4,200}$/';
 
     public function __construct(
         private readonly LiveCodeRepository $repository,
         private readonly EntityManagerInterface $em,
+        private readonly TickAfrica $tickAfrica,
+        private readonly LiveSettings $settings,
     ) {
     }
 
-    /** "pl-ab12 cd34" => "PLAB12CD34" */
-    public static function normalize(string $raw): string
+    /** Retire les espaces ; la casse est conservée : les codes Tick Africa y sont sensibles. */
+    public static function clean(string $raw): string
     {
-        return strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', $raw));
+        return (string) preg_replace('/\s+/u', '', $raw);
     }
 
-    /** "PLAB12CD34" => "PL-AB12-CD34" */
-    public static function format(string $normalized): string
+    /** "kR4mNpQ2:3fA9xQ7L…" (contenu du QR) => "kR4mNpQ2" (code imprimé) */
+    public static function key(string $cleaned): string
     {
-        return sprintf('%s-%s-%s', substr($normalized, 0, 2), substr($normalized, 2, 4), substr($normalized, 6));
+        return explode(':', $cleaned, 2)[0];
     }
 
-    public function find(string $normalized): ?LiveCode
+    /** Billet déjà validé sur ce site. */
+    public function find(string $code): ?LiveCode
     {
-        return $this->repository->findOneByCode($normalized);
-    }
-
-    /**
-     * Crée $count nouveaux codes.
-     *
-     * @return list<LiveCode>
-     */
-    public function generate(int $count): array
-    {
-        $taken = array_fill_keys($this->repository->allCodes(), true);
-        $created = [];
-
-        while (count($created) < $count) {
-            $code = self::PREFIX;
-            for ($i = 0; $i < 8; ++$i) {
-                $code .= self::ALPHABET[random_int(0, strlen(self::ALPHABET) - 1)];
-            }
-            if (isset($taken[$code])) {
-                continue;
-            }
-            $taken[$code] = true;
-            $entity = new LiveCode($code);
-            $this->em->persist($entity);
-            $created[] = $entity;
-        }
-        $this->em->flush();
-
-        return $created;
+        return $this->repository->findOneByCode($code);
     }
 
     /**
-     * Importe des codes existants (ex. la liste remise à Tickafrica).
-     * Chaque ligne : le code, éventuellement suivi d'un libellé après ";" ou ",".
+     * Fait valider par Tick Africa un code jamais vu ici, et l'enregistre s'il est admis.
      *
-     * @param iterable<string> $lines
+     * @return LiveCode|TicketVerdict le billet admis, ou le refus de Tick Africa
      *
-     * @return array{added: int, skipped: int, invalid: int}
+     * @throws TickAfricaUnavailable
      */
-    public function import(iterable $lines): array
+    public function redeem(string $input): LiveCode|TicketVerdict
     {
-        $taken = array_fill_keys($this->repository->allCodes(), true);
-        $added = $skipped = $invalid = 0;
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ('' === $line || str_starts_with($line, '#')) {
-                continue;
-            }
-            $fields = preg_split('/[;,\t]/', $line, 2);
-            // la ligne d'en-tête éventuelle ("code", "numero;code"…) est ignorée
-            $code = self::normalize($fields[0]);
-            $label = isset($fields[1]) ? trim($fields[1]) : null;
-
-            if (!preg_match('/^[A-Z0-9]{6,16}$/', $code) || in_array(strtolower($fields[0]), ['code', 'numero', 'n°'], true)) {
-                ++$invalid;
-                continue;
-            }
-            if (isset($taken[$code])) {
-                ++$skipped;
-                continue;
-            }
-            $taken[$code] = true;
-            $this->em->persist(new LiveCode($code, $label ?: null));
-            ++$added;
+        if (!preg_match(self::INPUT_PATTERN, $input)) {
+            return TicketVerdict::refused('invalid_code');
         }
-        $this->em->flush();
 
-        return ['added' => $added, 'skipped' => $skipped, 'invalid' => $invalid];
+        $eventId = $this->settings->tickafricaEventId();
+        if ('' === $eventId) {
+            // Sans événement, un billet de la salle serait accepté… et son entrée enregistrée
+            throw new TickAfricaUnavailable('Événement Tick Africa du direct non configuré.');
+        }
+
+        $verdict = $this->tickAfrica->validate($input, $eventId);
+
+        if (!$verdict->valid) {
+            // Déjà entré… peut-être par ce site (saisie simultanée sur deux appareils, autre casse)
+            if ('already_used' === $verdict->reason && null !== $verdict->code && null !== ($known = $this->find($verdict->code))) {
+                return $known;
+            }
+
+            return $verdict;
+        }
+
+        $key = $verdict->code ?? self::key($input);
+        $code = $this->find($key);
+
+        if (null === $code) {
+            $code = new LiveCode($key, $verdict->label());
+            $this->em->persist($code);
+            $this->em->flush();
+        }
+
+        return $code;
     }
 }

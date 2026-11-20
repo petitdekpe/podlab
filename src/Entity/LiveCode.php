@@ -6,7 +6,7 @@ use App\Repository\LiveCodeRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * Un code d'accès au direct = un billet.
+ * Un billet Tick Africa validé pour le direct (créé à sa première saisie).
  */
 #[ORM\Entity(repositoryClass: LiveCodeRepository::class)]
 #[ORM\Table(name: 'live_code')]
@@ -18,11 +18,11 @@ class LiveCode
     #[ORM\Column]
     private ?int $id = null;
 
-    /** Code normalisé (majuscules, sans tirets) : PLAB12CD34 */
-    #[ORM\Column(length: 16)]
+    /** Code du billet Tick Africa, casse comprise : kR4mNpQ2 */
+    #[ORM\Column(length: 64)]
     private string $code;
 
-    /** Libellé libre : nom de l'acheteur, référence Tickafrica… */
+    /** Porteur et type de billet donnés par Tick Africa, modifiable dans l'administration */
     #[ORM\Column(length: 160, nullable: true)]
     private ?string $label = null;
 

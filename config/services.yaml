@@ -30,3 +30,10 @@ services:
             $endsAt: '%env(LIVE_ENDS_AT)%'
             $superCodeHash: '%env(string:LIVE_SUPERCODE_HASH)%'
             $liveTicketUrl: '%env(string:LIVE_TICKETS_URL)%'
+            $tickafricaEventId: '%env(string:TICKAFRICA_EVENT_ID)%'
+
+    # API Organisateur Tick Africa : validation des billets du direct
+    App\Live\TickAfrica:
+        arguments:
+            $apiKey: '%env(string:TICKAFRICA_API_KEY)%'
+            $apiUrl: '%env(string:TICKAFRICA_API_URL)%'

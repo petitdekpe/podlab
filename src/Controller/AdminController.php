@@ -3,10 +3,10 @@
 namespace App\Controller;
 
 use App\Live\AdminAuth;
-use App\Live\LiveCodes;
 use App\Live\LiveSessions;
 use App\Live\LiveSettings;
 use App\Live\SuperCode;
+use App\Live\TickAfrica;
 use App\Repository\LiveCodeRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,13 +24,12 @@ use Symfony\Component\Routing\Attribute\Route;
 final class AdminController extends AbstractController
 {
     private const CSRF_ID = 'admin';
-    private const MAX_GENERATE = 500;
 
     public function __construct(
         private readonly AdminAuth $auth,
         private readonly SuperCode $superCode,
         private readonly LiveSettings $settings,
-        private readonly LiveCodes $codes,
+        private readonly TickAfrica $tickAfrica,
         private readonly LiveCodeRepository $repository,
         private readonly LiveSessions $sessions,
         private readonly EntityManagerInterface $em,
@@ -57,7 +56,7 @@ final class AdminController extends AbstractController
                 $error = 'Session expirée. Réessayez.';
             } elseif ($this->sessions->isThrottled($key)) {
                 $error = 'Trop d\'essais. Patientez quelques minutes avant de réessayer.';
-            } elseif ($this->superCode->verify(LiveCodes::normalize((string) $request->request->get('supercode')))) {
+            } elseif ($this->superCode->verify(SuperCode::normalize((string) $request->request->get('supercode')))) {
                 $this->sessions->clearFailures($key);
                 $this->auth->login($session);
 
@@ -102,6 +101,9 @@ final class AdminController extends AbstractController
             },
             'enabled' => $this->settings->enabled(),
             'youtube_ok' => '' !== $this->settings->youtubeId(),
+            'tickafrica_key' => $this->tickAfrica->isConfigured(),
+            'tickafrica_test' => $this->tickAfrica->isTestMode(),
+            'tickafrica_event' => '' !== $this->settings->tickafricaEventId(),
             'opens_at' => $opens,
             'ends_at' => $ends,
         ]));
@@ -124,6 +126,7 @@ final class AdminController extends AbstractController
             'watermark' => $this->settings->watermark(),
             'soldout' => $this->settings->soldOut(),
             'live_ticket_url' => (string) $this->settings->get('live_ticket_url'),
+            'tickafrica_event_id' => (string) $this->settings->get('tickafrica_event_id'),
         ];
 
         if ($request->isMethod('POST')) {
@@ -139,6 +142,7 @@ final class AdminController extends AbstractController
                     'watermark' => $request->request->getBoolean('watermark'),
                     'soldout' => $request->request->getBoolean('soldout'),
                     'live_ticket_url' => trim((string) $request->request->get('live_ticket_url')),
+                    'tickafrica_event_id' => trim((string) $request->request->get('tickafrica_event_id')),
                 ];
 
                 $opens = $this->parseLocal($form['opens_at'], $tz);
@@ -152,6 +156,9 @@ final class AdminController extends AbstractController
                 }
                 if ('' !== $form['live_ticket_url'] && '' === LiveSettings::normalizeEmbedUrl($form['live_ticket_url'])) {
                     $errors[] = 'Le lien de la billetterie du direct doit être une adresse complète commençant par https://.';
+                }
+                if ('' !== $form['tickafrica_event_id'] && '' === LiveSettings::normalizeUuid($form['tickafrica_event_id'])) {
+                    $errors[] = 'L\'identifiant de l\'événement Tick Africa doit être un UUID (ex. 9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d).';
                 }
                 if (null === $opens || null === $ends) {
                     $errors[] = 'Les dates d\'ouverture et de fin sont obligatoires.';
@@ -168,6 +175,7 @@ final class AdminController extends AbstractController
                     $this->settings->set('watermark', $form['watermark'] ? '1' : '0');
                     $this->settings->set('soldout', $form['soldout'] ? '1' : '0');
                     $this->settings->set('live_ticket_url', '' === $form['live_ticket_url'] ? null : $form['live_ticket_url']);
+                    $this->settings->set('tickafrica_event_id', LiveSettings::normalizeUuid($form['tickafrica_event_id']) ?: null);
                     $this->addFlash('admin_ok', 'Paramètres enregistrés.');
 
                     return $this->redirectToRoute('app_admin_settings');
@@ -180,6 +188,9 @@ final class AdminController extends AbstractController
             'errors' => $errors,
             'timezone' => LiveSettings::TIMEZONE,
             'live_ticket_default' => $this->settings->defaultLiveTicketUrl(),
+            'tickafrica_event_default' => LiveSettings::normalizeUuid($this->settings->tickafricaEventIdDefault()),
+            'tickafrica_key' => $this->tickAfrica->isConfigured(),
+            'tickafrica_test' => $this->tickAfrica->isTestMode(),
         ]));
     }
 
@@ -203,7 +214,7 @@ final class AdminController extends AbstractController
     {
         $q = trim((string) $request->query->get('q'));
         $status = (string) $request->query->get('statut', 'all');
-        $status = \in_array($status, ['all', 'used', 'unused', 'revoked'], true) ? $status : 'all';
+        $status = \in_array($status, ['all', 'used', 'revoked'], true) ? $status : 'all';
         $page = max(1, $request->query->getInt('page', 1));
 
         $result = $this->repository->search($q, $status, $page);
@@ -216,43 +227,26 @@ final class AdminController extends AbstractController
             'q' => $q,
             'status' => $status,
             'back' => $request->getRequestUri(),
-            'max_generate' => self::MAX_GENERATE,
         ]));
-    }
-
-    #[Route('/codes/generer', name: 'app_admin_codes_generate', methods: ['POST'])]
-    public function generate(Request $request): Response
-    {
-        if ($this->isCsrfTokenValid(self::CSRF_ID, (string) $request->request->get('_token'))) {
-            $count = $request->request->getInt('count');
-
-            if ($count < 1 || $count > self::MAX_GENERATE) {
-                $this->addFlash('admin_error', sprintf('Choisissez un nombre entre 1 et %d.', self::MAX_GENERATE));
-            } else {
-                $this->codes->generate($count);
-                $this->addFlash('admin_ok', sprintf('%d code(s) ajouté(s) à la fin de la liste.', $count));
-            }
-        }
-
-        return $this->redirectToRoute('app_admin_codes');
     }
 
     #[Route('/codes/export.csv', name: 'app_admin_codes_export', methods: ['GET'])]
     public function export(): Response
     {
-        $lines = ["numero;code;libelle;statut"];
+        $lines = ["numero;code;libelle;statut;premiere_connexion"];
         foreach ($this->repository->allOrdered() as $i => $code) {
             $lines[] = implode(';', [
                 $i + 1,
-                LiveCodes::format($code->getCode()),
+                $this->csvCell($code->getCode()),
                 $this->csvCell((string) $code->getLabel()),
-                $code->isRevoked() ? 'révoqué' : (null === $code->getFirstUsedAt() ? 'non utilisé' : 'utilisé'),
+                $code->isRevoked() ? 'révoqué' : 'actif',
+                $code->getFirstUsedAt()?->setTimezone(new \DateTimeZone(LiveSettings::TIMEZONE))->format('d/m/Y H:i') ?? '',
             ]);
         }
 
         $response = new Response("\xEF\xBB\xBF".implode("\r\n", $lines)."\r\n"); // BOM : Excel lit bien l'UTF-8
         $response->headers->set('Content-Type', 'text/csv; charset=utf-8');
-        $response->headers->set('Content-Disposition', 'attachment; filename="codes-direct.csv"');
+        $response->headers->set('Content-Disposition', 'attachment; filename="billets-direct.csv"');
 
         return $this->page($response);
     }

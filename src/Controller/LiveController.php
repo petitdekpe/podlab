@@ -7,6 +7,8 @@ use App\Live\LiveCodes;
 use App\Live\LiveSessions;
 use App\Live\LiveSettings;
 use App\Live\SuperCode;
+use App\Live\TickAfricaUnavailable;
+use App\Live\TicketVerdict;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -14,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Page de direct : accessible uniquement avec un code de billet (ou le supercode).
+ * Page de direct : accessible uniquement avec un code de billet Tick Africa (ou le supercode).
  *
  * L'identifiant de la vidéo YouTube n'est jamais dans le HTML : il n'est
  * fourni par /live/flux qu'à un billet valide, et seulement pendant la
@@ -60,7 +62,7 @@ final class LiveController extends AbstractController
             'opens_at' => $opens,
             'ends_at' => $this->settings->endsAt(),
             'opens_label' => $this->label($opens),
-            'watermark' => $viewer['super'] ? 'Superadmin' : ($this->settings->watermark() && $viewer['code'] ? 'Billet '.LiveCodes::format($viewer['code']->getCode()) : null),
+            'watermark' => $viewer['super'] ? 'Superadmin' : ($this->settings->watermark() && $viewer['code'] ? 'Billet '.$viewer['code']->getCode() : null),
             'is_super' => $viewer['super'],
         ]));
     }
@@ -82,10 +84,10 @@ final class LiveController extends AbstractController
             return $this->redirectToRoute('app_live');
         }
 
-        $normalized = LiveCodes::normalize((string) $request->request->get('code'));
+        $input = LiveCodes::clean((string) $request->request->get('code'));
 
         // Supercode
-        if ($this->superCode->verify($normalized)) {
+        if ($this->superCode->verify(SuperCode::normalize($input))) {
             $this->sessions->clearFailures($ip);
             $session = $request->getSession();
             $session->migrate(true);
@@ -94,13 +96,42 @@ final class LiveController extends AbstractController
             return $this->redirectToRoute('app_live');
         }
 
-        $code = $this->codes->find($normalized);
+        // Direct terminé ou fermé : on ne consomme pas de billet chez Tick Africa
+        if (new \DateTimeImmutable() >= $this->settings->endsAt() || !$this->settings->enabled()) {
+            return $this->redirectToRoute('app_live');
+        }
 
-        if (null === $code || $code->isRevoked()) {
+        if ('' === $input) {
+            return $this->redirectToRoute('app_live');
+        }
+
+        // Billet déjà validé sur ce site : pas de nouvel appel à Tick Africa
+        $code = $this->codes->find(LiveCodes::key($input));
+
+        if (null === $code) {
+            try {
+                $result = $this->codes->redeem($input);
+            } catch (TickAfricaUnavailable) {
+                $this->addFlash('live_error', 'La vérification des billets est momentanément indisponible. Réessayez dans un instant.');
+
+                return $this->redirectToRoute('app_live');
+            }
+
+            if ($result instanceof TicketVerdict) {
+                if ('too_early' !== $result->reason) {
+                    $this->sessions->registerFailure($ip);
+                }
+                $this->addFlash('live_error', $result->publicMessage());
+
+                return $this->redirectToRoute('app_live');
+            }
+
+            $code = $result;
+        }
+
+        if ($code->isRevoked()) {
             $this->sessions->registerFailure($ip);
-            $this->addFlash('live_error', null === $code
-                ? 'Ce code n\'est pas valide. Vérifiez-le dans l\'e-mail de votre billet.'
-                : 'Ce code n\'est plus valide. Contactez les organisateurs.');
+            $this->addFlash('live_error', 'Ce code n\'est plus valide. Contactez les organisateurs.');
 
             return $this->redirectToRoute('app_live');
         }

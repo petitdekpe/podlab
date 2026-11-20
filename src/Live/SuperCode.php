@@ -16,9 +16,17 @@ final class SuperCode
 {
     private const PREFIX = 'SUPER';
     private const BODY_LENGTH = 16;
+    // Sans 0/O ni 1/I/L pour éviter les erreurs de saisie
+    private const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
     public function __construct(private readonly LiveSettings $settings)
     {
+    }
+
+    /** "super-ab12 cd34…" => "SUPERAB12CD34…" */
+    public static function normalize(string $raw): string
+    {
+        return strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', $raw));
     }
 
     public function isConfigured(): bool
@@ -61,7 +69,7 @@ final class SuperCode
     {
         $body = '';
         for ($i = 0; $i < self::BODY_LENGTH; ++$i) {
-            $body .= LiveCodes::ALPHABET[random_int(0, strlen(LiveCodes::ALPHABET) - 1)];
+            $body .= self::ALPHABET[random_int(0, strlen(self::ALPHABET) - 1)];
         }
         $normalized = self::PREFIX.$body;
         $display = self::PREFIX.'-'.implode('-', str_split($body, 4));

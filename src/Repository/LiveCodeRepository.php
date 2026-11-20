@@ -18,19 +18,13 @@ class LiveCodeRepository extends ServiceEntityRepository
         parent::__construct($registry, LiveCode::class);
     }
 
-    public function findOneByCode(string $normalized): ?LiveCode
+    public function findOneByCode(string $code): ?LiveCode
     {
-        return '' === $normalized ? null : $this->findOneBy(['code' => $normalized]);
-    }
-
-    /** @return list<string> tous les codes existants (pour éviter les doublons) */
-    public function allCodes(): array
-    {
-        return array_column($this->createQueryBuilder('c')->select('c.code')->getQuery()->getArrayResult(), 'code');
+        return '' === $code ? null : $this->findOneBy(['code' => $code]);
     }
 
     /**
-     * @param 'all'|'used'|'unused'|'revoked' $status
+     * @param 'all'|'used'|'revoked' $status
      *
      * @return array{items: list<LiveCode>, total: int, pages: int}
      */
@@ -48,7 +42,6 @@ class LiveCodeRepository extends ServiceEntityRepository
 
         match ($status) {
             'used' => $qb->andWhere('c.firstUsedAt IS NOT NULL AND c.revokedAt IS NULL'),
-            'unused' => $qb->andWhere('c.firstUsedAt IS NULL AND c.revokedAt IS NULL'),
             'revoked' => $qb->andWhere('c.revokedAt IS NOT NULL'),
             default => null,
         };
