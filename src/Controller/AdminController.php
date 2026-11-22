@@ -250,7 +250,7 @@ final class AdminController extends AbstractController
      */
     private function seanceFields(?array $posted = null): array
     {
-        $labels = ['marina-22' => 'Dim. 22 nov. · Majestic Marina', 'marina-28' => 'Sam. 28 nov. · Majestic Marina', 'wologuede-28' => 'Sam. 28 nov. · Majestic Wologuèdè'];
+        $labels = ['marina-22' => 'Dim. 22 nov. · Majestic Marina', 'marina-28' => 'Dim. 29 nov. · Majestic Marina', 'wologuede-28' => 'Dim. 29 nov. · Majestic Wologuèdè'];
         $defaults = $this->billetterie->defaultLinks();
         $fields = [];
 

@@ -81,8 +81,8 @@ final class Billetterie
 
         $plan = [
             ['marina-22', '2026-11-22T13:00:00+01:00', 'marina', $liens['marina-22'], $complet22, new \DateTimeImmutable() < $finDirect],
-            ['marina-28', '2026-11-28T13:00:00+01:00', 'marina', $liens['marina-28'], false, false],
-            ['wologuede-28', '2026-11-28T13:00:00+01:00', 'wologuede', $liens['wologuede-28'], false, false],
+            ['marina-28', '2026-11-29T13:00:00+01:00', 'marina', $liens['marina-28'], false, false],
+            ['wologuede-28', '2026-11-29T13:00:00+01:00', 'wologuede', $liens['wologuede-28'], false, false],
         ];
 
         $this->seances = [];
@@ -196,43 +196,44 @@ final class Billetterie
         $base = [$key, $start, self::SALLES[$salle]];
 
         if ($forcedSoldOut) {
-            return new Seance(...$base, status: Seance::COMPLET, liveAccess: $live, eventId: $eventId);
+            return new Seance(...$base, status: Seance::COMPLET, liveAccess: $live, eventId: $eventId, reason: 'complet_force');
         }
         if ($start <= new \DateTimeImmutable()) {
-            return new Seance(...$base, status: Seance::PASSEE, eventId: $eventId);
+            return new Seance(...$base, status: Seance::PASSEE, eventId: $eventId, reason: 'passee');
         }
         if ('' === $eventId || !$this->tickAfrica->isConfigured()) {
-            return new Seance(...$base, status: Seance::INDISPONIBLE, eventId: $eventId);
+            return new Seance(...$base, status: Seance::INDISPONIBLE, eventId: $eventId, reason: '' === $eventId ? 'non_reliee' : 'sans_cle');
         }
 
         [$event, $stale, $notFound] = $this->event($eventId);
         if ($notFound) {
-            return new Seance(...$base, status: Seance::FERMEE, eventId: $eventId);
+            return new Seance(...$base, status: Seance::FERMEE, eventId: $eventId, reason: 'introuvable');
         }
         if (null === $event) {
-            return new Seance(...$base, status: Seance::INDISPONIBLE, eventId: $eventId);
+            return new Seance(...$base, status: Seance::INDISPONIBLE, eventId: $eventId, reason: 'injoignable');
         }
 
-        $tarifs = [];
-        foreach (\is_array($event['products'] ?? null) ? $event['products'] : [] as $product) {
-            if (!\is_array($product) || ([] !== $productIds && !\in_array($product['id'] ?? null, $productIds, true))) {
-                continue;
-            }
-            if ([] === $productIds && 'ticket' !== ($product['type'] ?? 'ticket')) {
-                continue; // boissons, goodies… : on ne vend ici que des places
-            }
-            if (null !== $tarif = Tarif::fromApi($product)) {
-                $tarifs[] = $tarif;
-            }
+        $products = array_values(array_filter(\is_array($event['products'] ?? null) ? $event['products'] : [], 'is_array'));
+        if ([] !== $productIds) {
+            // Billets choisis dans /admin
+            $products = array_filter($products, static fn (array $p): bool => \in_array(strtolower((string) ($p['id'] ?? '')), $productIds, true));
+        } else {
+            // Sinon les places (type « ticket »), en écartant boissons et goodies…
+            // sauf si Tick Africa nomme autrement ses places : on garde alors tout
+            $places = array_filter($products, static fn (array $p): bool => 'ticket' === ($p['type'] ?? 'ticket'));
+            $products = [] !== $places ? $places : $products;
         }
+        $tarifs = array_values(array_filter(array_map(Tarif::fromApi(...), $products)));
 
-        $status = match (true) {
-            !($event['is_on_sale'] ?? false), !($event['sellable_via_api'] ?? false), [] === $tarifs => Seance::FERMEE,
-            [] === array_filter($tarifs, static fn (Tarif $t): bool => $t->available) => Seance::COMPLET,
-            default => Seance::EN_VENTE,
+        [$status, $reason] = match (true) {
+            !($event['sellable_via_api'] ?? false) => [Seance::FERMEE, 'plan_de_salle'],
+            !($event['is_on_sale'] ?? false) => [Seance::FERMEE, 'pas_en_vente'],
+            [] === $tarifs => [Seance::FERMEE, [] !== $productIds ? 'billets_non_trouves' : 'aucun_billet'],
+            [] === array_filter($tarifs, static fn (Tarif $t): bool => $t->available) => [Seance::COMPLET, 'epuise'],
+            default => [Seance::EN_VENTE, ''],
         };
 
-        return new Seance(...$base, status: $status, tarifs: $tarifs, eventId: $eventId, stale: $stale);
+        return new Seance(...$base, status: $status, tarifs: $tarifs, eventId: $eventId, stale: $stale, reason: $reason, eventName: (string) ($event['name'] ?? ''));
     }
 
     /**

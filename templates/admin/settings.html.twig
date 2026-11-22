@@ -116,6 +116,15 @@
                         <input id="seance-{{ key }}-tarifs" name="seances[{{ key }}][tarifs]" type="text" class="adm-input" value="{{ seance.tarifs }}" placeholder="Tous les billets de l'événement" autocomplete="off" spellcheck="false">
                     </div>
                 </div>
+                {% if etat and (etat.eventName or etat.reason) %}
+                    <p class="adm-help">
+                        {% if etat.eventName %}Événement trouvé chez Tick Africa&nbsp;: <strong>{{ etat.eventName }}</strong>.{% endif %}
+                        {% if etat.reason and etat.reason != 'complet_force' %}
+                            {% if etat.status != 'en_vente' %}<strong>Pourquoi&nbsp;?</strong>{% endif %}
+                            {{ constant('App\\Billetterie\\Seance::REASONS')[etat.reason] ?? etat.reason }}
+                        {% endif %}
+                    </p>
+                {% endif %}
                 {% if etat and etat.tarifs|length > 0 %}
                     <p class="adm-help">
                         {% for t in etat.tarifs %}
@@ -130,7 +139,7 @@
 
         <label class="adm-check">
             <input type="checkbox" name="soldout" value="1"{{ form.soldout ? ' checked' }}>
-            <span><strong>Séance du 22 novembre « Sold out »</strong><br><span class="adm-muted">Affiche la séance du 22 au Majestic Marina comme complète, avec le bouton d'achat d'un accès au direct. Les séances du 28 suivent la disponibilité en temps réel de Tick Africa. Décochez pour remettre la séance du 22 en vente (son événement doit alors être renseigné ci-dessus).</span></span>
+            <span><strong>Séance du 22 novembre « Sold out »</strong><br><span class="adm-muted">Affiche la séance du 22 au Majestic Marina comme complète, avec le bouton d'achat d'un accès au direct. Les séances du 29 suivent la disponibilité en temps réel de Tick Africa. Décochez pour remettre la séance du 22 en vente (son événement doit alors être renseigné ci-dessus).</span></span>
         </label>
 
         <label class="adm-label" for="live_ticket_url">Billetterie des accès au direct (Tickafrica)</label>

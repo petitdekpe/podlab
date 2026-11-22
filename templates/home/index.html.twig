@@ -3,8 +3,8 @@
 {% block title %}Edgar-Yves : Moi, à quatre pattes ?! · Billetterie Podlab au cinéma{% endblock %}
 
 {% block meta %}
-    {% set apercu_titre = 'Podlab au cinéma : nouvelles séances le 28 novembre' %}
-    {% set apercu_description = "Edgar-Yves : Moi, à quatre pattes ?! Ceci n'est pas un podcast, ceci n'est pas un stand-up, c'est un sit-down. Séance du 22 novembre complète. Nouvelles séances le samedi 28 novembre 2026 à 13h00 au Majestic Marina et au Majestic Wologuèdè, Cotonou." %}
+    {% set apercu_titre = 'Podlab au cinéma : nouvelles séances le 29 novembre' %}
+    {% set apercu_description = "Edgar-Yves : Moi, à quatre pattes ?! Ceci n'est pas un podcast, ceci n'est pas un stand-up, c'est un sit-down. Séance du 22 novembre complète. Nouvelles séances le dimanche 29 novembre 2026 à 13h00 au Majestic Marina et au Majestic Wologuèdè, Cotonou." %}
     <meta name="description" content="{{ apercu_description }}">
 
     {# Aperçu du lien (WhatsApp, Facebook, LinkedIn, X…) #}
@@ -172,7 +172,7 @@
             <div class="hero__cta">
                 {% if en_vente %}
                     <a href="#reservation" class="btn btn--primary btn--lg">
-                        Je réserve pour le 28 novembre · dès {{ prix }}&nbsp;FCFA
+                        Je réserve pour le 29 novembre · dès {{ prix }}&nbsp;FCFA
                         {{ icone_fleche }}
                     </a>
                     <span class="hero__cta-note">Mobile Money ou carte · billet envoyé par e-mail.</span>
@@ -326,7 +326,7 @@
     {# Barre d'action collante (mobile) : visible une fois la billetterie du haut dépassée #}
     <div class="sticky-cta" data-controller="sticky-cta" data-sticky-cta-watch-value='["#reservation", ".hero__cta"]'>
         {% if en_vente %}
-            <a href="#reservation" class="btn btn--primary">Réserver le 28 nov. · dès {{ prix }}&nbsp;FCFA</a>
+            <a href="#reservation" class="btn btn--primary">Réserver le 29 nov. · dès {{ prix }}&nbsp;FCFA</a>
         {% elseif seance_direct %}
             <button type="button" class="btn btn--primary" data-open-modal="live-tickets">Sold out · Suivre le direct</button>
         {% else %}
@@ -336,7 +336,7 @@
 
     {# ---------- Pop-up : accès au direct du 22 novembre (3 validations) + achat ----------
          S'ouvre à chaque clic sur un bouton data-open-modal="live-tickets" (plus d'ouverture
-         automatique : la page met désormais en avant les séances du 28).
+         automatique : la page met désormais en avant les séances du 29).
          Parcours : annonce → 1. principe → 2. règles → 3. engagement → achat (formulaire Tickafrica). #}
     {% if seance_direct %}
     <dialog
@@ -363,7 +363,7 @@
                 </p>
                 <p class="modal__text">Avant d'acheter, prenez une minute pour comprendre comment fonctionne le direct&nbsp;: trois courtes étapes.</p>
                 {% if en_vente %}
-                    <p class="modal__text">Vous préférez la salle&nbsp;? <a href="#reservation" data-action="modal#close">Il reste des places le samedi 28 novembre</a>.</p>
+                    <p class="modal__text">Vous préférez la salle&nbsp;? <a href="#reservation" data-action="modal#close">Il reste des places le dimanche 29 novembre</a>.</p>
                 {% endif %}
                 <div class="step__actions">
                     <button type="button" class="btn btn--primary" data-action="steps#start">Acheter un accès au direct</button>

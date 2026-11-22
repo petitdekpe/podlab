@@ -39,13 +39,13 @@ final class BilletterieTest extends TestCase
         // 22 : complète par défaut (réglage /admin), avec le direct
         self::assertSame(Seance::COMPLET, $seances['marina-22']->status);
         self::assertTrue($seances['marina-22']->liveAccess);
-        // 28 Marina : en vente, 12 places
+        // 29 Marina : en vente, 12 places
         self::assertSame(Seance::EN_VENTE, $seances['marina-28']->status);
         self::assertSame(12, $seances['marina-28']->placesRestantes());
         self::assertSame(10000, $seances['marina-28']->prixMin());
-        // 28 Wologuèdè : plus de stock
+        // 29 Wologuèdè : plus de stock
         self::assertSame(Seance::COMPLET, $seances['wologuede-28']->status);
-        self::assertSame('Samedi 28 novembre', $seances['wologuede-28']->jour());
+        self::assertSame('Dimanche 29 novembre', $seances['wologuede-28']->jour());
         self::assertSame('13h00', $seances['wologuede-28']->heure());
         self::assertSame($seances['marina-28'], $billetterie->prochaine());
     }
@@ -65,6 +65,35 @@ final class BilletterieTest extends TestCase
         self::assertTrue($seance->stale);
     }
 
+    public function testClosedSeanceExplainsWhy(): void
+    {
+        $seated = $this->event(self::TARIF_MARINA, 10);
+        $seated['data']['sellable_via_api'] = false;
+        $offSale = $this->event(self::TARIF_WOLO, 10);
+        $offSale['data']['is_on_sale'] = false;
+
+        $seances = $this->billetterie([self::MARINA => $seated, self::WOLO => $offSale])->seances();
+
+        self::assertSame([Seance::FERMEE, 'plan_de_salle'], [$seances['marina-28']->status, $seances['marina-28']->reason]);
+        self::assertSame([Seance::FERMEE, 'pas_en_vente'], [$seances['wologuede-28']->status, $seances['wologuede-28']->reason]);
+        self::assertSame('Podlab au cinéma', $seances['marina-28']->eventName);
+
+        // 404 : identifiant erroné ou événement d'un autre compte
+        $missing = $this->billetterie([self::WOLO => $offSale], wologuede: '55555555-5555-4555-8555-555555555555')->seances();
+        self::assertSame('introuvable', $missing['wologuede-28']->reason);
+    }
+
+    public function testTicketsWithAnotherTypeAreStillSold(): void
+    {
+        // Si Tick Africa ne type pas ses places « ticket », on ne les écarte pas toutes
+        $event = $this->event(self::TARIF_MARINA, 10);
+        $event['data']['products'][0]['type'] = 'standard';
+
+        $seance = $this->billetterie([self::MARINA => $event])->seances()['marina-28'];
+
+        self::assertSame(Seance::EN_VENTE, $seance->status);
+    }
+
     public function testUnconfiguredSeanceIsShownAsComingSoon(): void
     {
         $seances = $this->billetterie([], null, wologuede: '')->seances();
@@ -74,7 +103,7 @@ final class BilletterieTest extends TestCase
 
     public function testProductFilterKeepsOnlyTheSeanceTickets(): void
     {
-        // Les deux séances du 28 dans un seul événement Tick Africa, un billet par salle
+        // Les deux séances du 29 dans un seul événement Tick Africa, un billet par salle
         $event = $this->event(self::TARIF_MARINA, 30);
         $event['data']['products'][] = ['id' => self::TARIF_WOLO, 'name' => 'Wologuèdè', 'type' => 'ticket', 'price' => '8000.00', 'available_quantity' => 5, 'is_available' => true];
 

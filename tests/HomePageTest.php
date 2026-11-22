@@ -45,7 +45,7 @@ final class HomePageTest extends WebTestCase
         self::assertCount(1, $crawler->filter('#reservation .top__poster .poster img'));
         self::assertCount(1, $crawler->filter('#reservation .top__ticketing form.order'));
         self::assertSelectorTextContains('h1', 'Moi, à quatre pattes');
-        // Trois séances : le 22 complet (avec le direct), les deux du 28 en vente
+        // Trois séances : le 22 complet (avec le direct), les deux du 29 en vente
         self::assertCount(3, $crawler->filter('input[name="billet"]'));
         self::assertCount(2, $crawler->filter('input[name="billet"]:not([disabled])'));
         self::assertStringContainsString('Majestic Wologuèdè', $crawler->filter('form.order')->text());

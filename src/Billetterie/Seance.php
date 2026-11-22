@@ -31,10 +31,29 @@ final class Seance
         public readonly string $eventId = '',
         /** Données affichées issues du dernier relevé réussi (Tick Africa injoignable depuis) */
         public readonly bool $stale = false,
+        /** Pourquoi la séance n'est pas en vente (voir REASONS), pour l'administration */
+        public readonly string $reason = '',
+        /** Nom de l'événement chez Tick Africa, pour vérifier qu'on a relié le bon */
+        public readonly string $eventName = '',
     ) {
     }
 
-    /** « Samedi 28 novembre » (heure du Bénin) */
+    /** Explication de $reason, pour l'administration. */
+    public const REASONS = [
+        'complet_force' => 'Marquée « Sold out » dans ces paramètres.',
+        'passee' => 'La séance a eu lieu.',
+        'non_reliee' => 'Aucun événement Tick Africa renseigné.',
+        'sans_cle' => 'Aucune clé API Tick Africa.',
+        'injoignable' => 'Tick Africa ne répond pas, ou la clé n\'a pas la portée events:read.',
+        'introuvable' => 'Tick Africa ne trouve pas cet événement avec cette clé : identifiant erroné, événement non publié, ou appartenant à un autre compte.',
+        'pas_en_vente' => 'Tick Africa indique que l\'événement n\'est pas ouvert à la vente (is_on_sale = false) : vérifiez les dates de vente et la publication dans le back-office.',
+        'plan_de_salle' => 'Événement avec plan de salle : Tick Africa ne permet pas de le vendre par l\'API (sellable_via_api = false). Retirez le plan de salle (placement libre) dans le back-office Tick Africa.',
+        'aucun_billet' => 'L\'événement n\'a aucun billet chez Tick Africa.',
+        'billets_non_trouves' => 'Aucun des billets indiqués dans « Billets à vendre » n\'appartient à cet événement.',
+        'epuise' => 'Tous les billets sont vendus ou retirés de la vente.',
+    ];
+
+    /** « Dimanche 29 novembre » (heure du Bénin) */
     public function jour(): string
     {
         $d = $this->local();
@@ -42,7 +61,7 @@ final class Seance
         return sprintf('%s %d %s', ucfirst(self::DAYS[(int) $d->format('w')]), (int) $d->format('j'), self::MONTHS[(int) $d->format('n')]);
     }
 
-    /** « Sam. 28 nov. » */
+    /** « Dim. 29 nov. » */
     public function jourCourt(): string
     {
         $d = $this->local();

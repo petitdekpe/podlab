@@ -37,7 +37,7 @@ final class TickAfricaEventCommand extends Command
             $io->table(['Séance', 'Salle', 'État', 'Événement', 'Tarifs'], array_map(static fn (Seance $s): array => [
                 $s->jourCourt().' '.$s->heure(),
                 $s->salle['name'],
-                $s->status.($s->stale ? ' (relevé ancien)' : ''),
+                $s->status.($s->stale ? ' (relevé ancien)' : '').($s->reason ? "\n".wordwrap(Seance::REASONS[$s->reason] ?? $s->reason, 40) : ''),
                 $s->eventId ?: '—',
                 implode("\n", array_map(static fn ($t): string => sprintf('%s · %d FCFA · %s', $t->name, $t->price, null === $t->remaining ? 'illimité' : $t->remaining.' restantes'), $s->tarifs)) ?: '—',
             ], array_values($this->billetterie->seances())));
