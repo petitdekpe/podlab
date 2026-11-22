@@ -238,7 +238,38 @@ final class AdminController extends AbstractController
             'can_store_secrets' => $this->settings->canStoreSecrets(),
             'tickafrica_events' => $this->tickafricaEvents(),
             'seances_etat' => $this->billetterie->seances(),
+            'derniere_erreur' => $this->lastOrderFailure(),
+            'diagnostic' => $request->getSession()->get('tickafrica_diagnostic'),
         ]));
+    }
+
+    /** Vérifie les autorisations de la clé auprès de Tick Africa (rien n'est créé ni consommé). */
+    #[Route('/tickafrica/verifier', name: 'app_admin_tickafrica_check', methods: ['POST'])]
+    public function checkTickAfrica(Request $request): Response
+    {
+        if ($this->isCsrfTokenValid(self::CSRF_ID, (string) $request->request->get('_token'))) {
+            $request->getSession()->set('tickafrica_diagnostic', [
+                'at' => (new \DateTimeImmutable('now', new \DateTimeZone(LiveSettings::TIMEZONE)))->format('d/m/Y H:i'),
+                'key' => $this->tickAfrica->maskedKey(),
+                'results' => $this->tickAfrica->diagnose(),
+            ]);
+        }
+
+        return $this->redirect($this->generateUrl('app_admin_settings').'#tickafrica-diagnostic');
+    }
+
+    /** @return array<string, mixed>|null */
+    private function lastOrderFailure(): ?array
+    {
+        $failure = $this->billetterie->lastFailure();
+        if (null === $failure) {
+            return null;
+        }
+
+        return $failure + [
+            'when' => (new \DateTimeImmutable($failure['at']))->setTimezone(new \DateTimeZone(LiveSettings::TIMEZONE))->format('d/m/Y à H:i'),
+            'explication' => Billetterie::explain($failure['error'], (int) $failure['status']),
+        ];
     }
 
     /**

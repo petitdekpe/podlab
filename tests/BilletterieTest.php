@@ -38,7 +38,8 @@ final class BilletterieTest extends TestCase
         self::assertSame(['marina-22', 'marina-28', 'wologuede-28'], array_keys($seances));
         // 22 : complète par défaut (réglage /admin), avec le direct
         self::assertSame(Seance::COMPLET, $seances['marina-22']->status);
-        self::assertTrue($seances['marina-22']->liveAccess);
+        // le direct est proposé jusqu'à sa fin (22/11, 16h00), plus après
+        self::assertSame(new \DateTimeImmutable() < new \DateTimeImmutable('2026-11-22T16:00:00+01:00'), $seances['marina-22']->liveAccess);
         // 29 Marina : en vente, 12 places
         self::assertSame(Seance::EN_VENTE, $seances['marina-28']->status);
         self::assertSame(12, $seances['marina-28']->placesRestantes());
@@ -154,6 +155,50 @@ final class BilletterieTest extends TestCase
             self::assertSame('INSUFFICIENT_STOCK', $e->apiError);
             self::assertStringContainsString('plus assez de places', Billetterie::message($e));
         }
+    }
+
+    public function testMissingOrdersScopeIsRecordedAndExplained(): void
+    {
+        $billetterie = $this->billetterie([
+            self::MARINA => $this->event(self::TARIF_MARINA, 12),
+            'orders' => new MockResponse(json_encode(['error' => 'MISSING_SCOPE', 'message' => 'This key lacks the orders:write scope.']), ['http_code' => 403]),
+        ]);
+        $commande = new Commande('marina-28|'.self::TARIF_MARINA, 1, 'Awa', 'Diallo', 'awa@example.com', '0166617878');
+        $billetterie->seances();
+
+        try {
+            $billetterie->commander($commande, '');
+            self::fail('Refus attendu');
+        } catch (TickAfricaUnavailable $e) {
+            $billetterie->recordFailure($e, 'marina-28');
+            self::assertStringContainsString('momentanément indisponible', Billetterie::message($e));
+        }
+
+        $failure = $billetterie->lastFailure();
+        self::assertSame([403, 'MISSING_SCOPE', 'This key lacks the orders:write scope.'], [$failure['status'], $failure['error'], $failure['message']]);
+        self::assertStringContainsString('orders:write', Billetterie::explain($failure['error'], $failure['status']));
+    }
+
+    public function testDiagnoseReportsEachScopeWithoutSelling(): void
+    {
+        $calls = [];
+        $http = new MockHttpClient(function (string $method, string $url, array $options) use (&$calls): MockResponse {
+            $calls[] = $method.' '.parse_url($url, \PHP_URL_PATH);
+
+            return match (true) {
+                str_ends_with(parse_url($url, \PHP_URL_PATH), '/orders') && 'POST' === $method => new MockResponse(json_encode(['error' => 'MISSING_SCOPE', 'message' => 'orders:write']), ['http_code' => 403]),
+                str_contains($url, '/tickets/check') => new MockResponse(json_encode(['success' => true, 'data' => ['valid' => false, 'reason' => 'invalid_code']])),
+                default => new MockResponse(json_encode(['success' => true, 'data' => []])),
+            };
+        });
+
+        $results = (new TickAfrica($http, new NullLogger(), 'ta_test_cle'))->diagnose();
+
+        self::assertTrue($results['events:read']['ok']);
+        self::assertFalse($results['orders:write']['ok']);
+        self::assertTrue($results['orders:read']['ok']);
+        self::assertTrue($results['tickets:validate']['ok']);
+        self::assertNotContains('POST /api/partner/v1/tickets/validate', $calls, 'aucune entrée enregistrée');
     }
 
     public function testFormValidation(): void

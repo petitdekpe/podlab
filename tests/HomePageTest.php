@@ -53,9 +53,11 @@ final class HomePageTest extends WebTestCase
         self::assertCount(3, $crawler->filter('form.order .dial'));
         self::assertSame('Sold out', $crawler->filter('.dial.is-soldout .dial__stamp')->text());
         self::assertSame('22', $crawler->filter('.dial.is-soldout .dial__day')->text());
-        self::assertSelectorExists('.dial.is-soldout .dial__live[data-open-modal="live-tickets"]');
+        // Bouton du direct : seulement tant que le direct n'est pas terminé (22/11, 16h00)
+        $directAVenir = new \DateTimeImmutable() < new \DateTimeImmutable('2026-11-22T16:00:00+01:00');
+        self::assertCount($directAVenir ? 1 : 0, $crawler->filter('.dial.is-soldout .dial__live[data-open-modal="live-tickets"]'));
         self::assertCount(3, $crawler->filter('.seance-strip__item'));
-        self::assertSelectorExists('dialog[data-modal-id-value="live-tickets"]');
+        self::assertCount($directAVenir ? 1 : 0, $crawler->filter('dialog[data-modal-id-value="live-tickets"]'));
     }
 
     public function testValidFormRedirectsToTickAfricaPayment(): void

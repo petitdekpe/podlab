@@ -152,6 +152,52 @@
         <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary">Enregistrer</button></p>
     </form>
 
+    <section class="adm-card" id="tickafrica-diagnostic">
+        <h2 class="adm-h2">Diagnostic Tick Africa</h2>
+
+        {% if derniere_erreur %}
+            <div class="adm-alert adm-alert--error" role="status">
+                <strong>Dernière commande échouée</strong> · {{ derniere_erreur.when }} · séance {{ derniere_erreur.seance }}<br>
+                Réponse&nbsp;: <code>{{ derniere_erreur.status ?: 'pas de réponse' }} {{ derniere_erreur.error }}</code>
+                {% if derniere_erreur.message %}· «&nbsp;{{ derniere_erreur.message }}&nbsp;»{% endif %}
+                {% if derniere_erreur.fields %}<br>Champs en cause&nbsp;: <code>{{ derniere_erreur.fields|join(', ') }}</code>{% endif %}
+                <br><strong>Que faire&nbsp;:</strong> {{ derniere_erreur.explication }}
+            </div>
+        {% else %}
+            <p class="adm-muted">Aucune commande échouée récemment.</p>
+        {% endif %}
+
+        <p class="adm-muted">Vérifie chaque autorisation de la clé auprès de Tick Africa. Rien n'est acheté, créé ni consommé.</p>
+        <form method="post" action="{{ path('app_admin_tickafrica_check') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+            <button type="submit" class="adm-btn adm-btn--primary">Vérifier les autorisations de la clé</button>
+        </form>
+
+        {% if diagnostic %}
+            <div class="adm-tablewrap adm-diag">
+                <table class="adm-table">
+                    <thead><tr><th>Autorisation</th><th>Sert à</th><th>Résultat</th></tr></thead>
+                    <tbody>
+                        {% set usages = {
+                            'events:read': 'Afficher les séances, prix et places',
+                            'orders:write': 'Vendre (créer la commande et le lien de paiement)',
+                            'orders:read': 'Afficher l\'état du paiement au retour',
+                            'tickets:validate': 'Vérifier les codes du direct',
+                        } %}
+                        {% for scope, r in diagnostic.results %}
+                            <tr>
+                                <td><code>{{ scope }}</code></td>
+                                <td>{{ usages[scope] ?? '' }}</td>
+                                <td>{{ r.ok is same as(true) ? '✅' : (r.ok is same as(false) ? '❌' : '⚠️') }} {{ r.detail }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="adm-help">Vérifié le {{ diagnostic.at }} avec la clé <code>{{ diagnostic.key }}</code>.</p>
+        {% endif %}
+    </section>
+
     <section class="adm-card">
         <h2 class="adm-h2">Supercode</h2>
         <p class="adm-muted">Le supercode ouvre cet espace d'administration et donne accès au direct à tout moment, sur autant d'appareils que nécessaire. Il ne s'affiche qu'une fois : en créer un nouveau désactive immédiatement l'ancien.</p>

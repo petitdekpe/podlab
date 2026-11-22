@@ -151,13 +151,55 @@ final class Billetterie
         if (!str_starts_with($url, 'https://')) {
             $this->logger->error('Tick Africa : lien de paiement absent ou invalide.', ['response' => $data]);
 
-            throw new TickAfricaUnavailable('Lien de paiement absent.');
+            throw new TickAfricaUnavailable('Lien de paiement absent.', 201, null, 'NO_PAYMENT_URL', [], 'Champs reçus : '.implode(', ', array_keys($data)).('' !== $url ? ' · payment_url = '.$url : ''));
         }
 
         // Les places affichées changent dès qu'un paiement aboutit : on relira le stock
         $this->cache->deleteItem($this->cacheKey($seance->eventId));
 
         return ['order_id' => (string) ($data['order_id'] ?? ''), 'payment_url' => $url];
+    }
+
+    /** Garde la dernière commande échouée, pour l'afficher dans /admin (sans données personnelles). */
+    public function recordFailure(TickAfricaUnavailable $e, string $seance): void
+    {
+        $item = $this->cache->getItem('billetterie.last_failure');
+        $this->cache->save($item->set([
+            'at' => (new \DateTimeImmutable())->format('c'),
+            'seance' => $seance,
+            'status' => $e->getCode(),
+            'error' => $e->apiError,
+            'message' => $e->apiMessage ?: $e->getMessage(),
+            'fields' => array_keys($e->fieldErrors),
+        ])->expiresAfter(86400 * 14));
+    }
+
+    /**
+     * @return array{at: string, seance: string, status: int, error: string, message: string, fields: list<string>}|null
+     */
+    public function lastFailure(): ?array
+    {
+        $item = $this->cache->getItem('billetterie.last_failure');
+
+        return $item->isHit() ? $item->get() : null;
+    }
+
+    /** Ce que signifie une erreur de commande et ce qu'il faut faire, pour /admin. */
+    public static function explain(string $error, int $status): string
+    {
+        return match (true) {
+            'MISSING_SCOPE' === $error => 'La clé n\'a pas le droit de créer des commandes : ajoutez-lui la portée orders:write dans le back-office Tick Africa (API & intégrations).',
+            'INVALID_API_KEY' === $error, 401 === $status => 'Tick Africa refuse la clé : régénérez-la et saisissez-la à nouveau.',
+            'VALIDATION_ERROR' === $error => 'Tick Africa refuse des données de la commande (champs en cause ci-dessous). Si c\'est return_url : enregistrez l\'URL de retour sur la clé.',
+            'IDEMPOTENCY_KEY_REUSED' === $error => 'Même tentative renvoyée avec des données différentes. Le site réessaie désormais tout seul : ce cas ne devrait plus bloquer l\'acheteur.',
+            'EVENT_REQUIRES_SEAT_SELECTION' === $error => 'Événement avec plan de salle : non vendable par l\'API. Passez-le en placement libre.',
+            'EVENT_NOT_ON_SALE' === $error, 'PRODUCT_UNAVAILABLE' === $error => 'L\'événement ou le billet n\'est pas en vente chez Tick Africa.',
+            'NO_PAYMENT_URL' === $error => 'Tick Africa a accepté la commande mais n\'a pas renvoyé de lien de paiement exploitable.',
+            'RATE_LIMITED' === $error => 'Trop de commandes en une minute (limite Tick Africa : 60/min).',
+            0 === $status => 'Tick Africa n\'a pas répondu à temps (réseau ou panne). Réessayez ; si cela persiste, contactez support@tick.africa.',
+            $status >= 500 => 'Panne chez Tick Africa. Réessayez plus tard ou contactez support@tick.africa.',
+            default => 'Erreur non répertoriée : transmettez ce message au support Tick Africa.',
+        };
     }
 
     /** Message à montrer à l'acheteur quand Tick Africa refuse ou ne répond pas. */
@@ -168,6 +210,7 @@ final class Billetterie
             'PRODUCT_UNAVAILABLE', 'EVENT_NOT_ON_SALE', 'EVENT_REQUIRES_SEAT_SELECTION' => 'Cette séance n\'est plus en vente. Choisissez-en une autre.',
             'VALIDATION_ERROR' => 'Vérifiez vos coordonnées : Tick Africa ne les a pas acceptées.',
             'RATE_LIMITED', 'REQUEST_IN_PROGRESS' => 'Beaucoup de monde réserve en ce moment. Réessayez dans quelques secondes.',
+            'MISSING_SCOPE', 'INVALID_API_KEY', 'NO_PAYMENT_URL' => 'La vente en ligne est momentanément indisponible. Réessayez un peu plus tard ou écrivez-nous sur WhatsApp au 0166617878 : vous n\'avez pas été débité.',
             default => 'La billetterie ne répond pas pour le moment. Réessayez dans un instant : vous n\'avez pas été débité.',
         };
     }

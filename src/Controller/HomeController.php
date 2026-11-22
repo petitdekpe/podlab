@@ -55,12 +55,21 @@ final class HomeController extends AbstractController
             return $this->page($commande, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        $retour = $this->generateUrl('app_billetterie_merci', [], UrlGeneratorInterface::ABSOLUTE_URL);
         try {
-            $paiement = $this->billetterie->commander(
-                $commande,
-                $this->generateUrl('app_billetterie_merci', [], UrlGeneratorInterface::ABSOLUTE_URL),
-            );
+            try {
+                $paiement = $this->billetterie->commander($commande, $retour);
+            } catch (TickAfricaUnavailable $e) {
+                // Clé déjà utilisée avec d'autres données (l'acheteur a corrigé sa saisie après
+                // une première tentative sans réponse) : c'est une nouvelle commande, nouvelle clé
+                if ('IDEMPOTENCY_KEY_REUSED' !== $e->apiError) {
+                    throw $e;
+                }
+                $commande->idempotencyKey = Commande::newKey();
+                $paiement = $this->billetterie->commander($commande, $retour);
+            }
         } catch (TickAfricaUnavailable $e) {
+            $this->billetterie->recordFailure($e, $commande->seanceKey());
             $commande->errors = Billetterie::fieldErrors($e);
             $commande->errors['form'] = Billetterie::message($e);
             // Refus métier : la prochaine tentative est une nouvelle commande.

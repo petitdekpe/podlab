@@ -238,13 +238,14 @@ final class TickAfrica
 
         $error = \is_string($data['error'] ?? null) ? $data['error'] : 'HTTP_'.$status;
         $fieldErrors = \is_array($data['errors'] ?? null) ? $data['errors'] : [];
-        $context = ['status' => $status, 'error' => $error, 'message' => $data['message'] ?? null, 'errors' => $fieldErrors, 'path' => $path];
+        $apiMessage = \is_string($data['message'] ?? null) ? $data['message'] : '';
+        $context = ['status' => $status, 'error' => $error, 'message' => $apiMessage, 'errors' => $fieldErrors, 'path' => $path];
 
         // Commande : un refus métier (stock épuisé, téléphone invalide…) n'est pas une panne
         if ('/orders' === $path && \in_array($status, [409, 422], true)) {
             $this->logger->warning('Tick Africa a refusé la commande : {error} ({message})', $context);
 
-            throw new TickAfricaUnavailable(sprintf('Commande refusée par Tick Africa (%s).', $error), $status, null, $error, $fieldErrors);
+            throw new TickAfricaUnavailable(sprintf('Commande refusée par Tick Africa (%s).', $error), $status, null, $error, $fieldErrors, $apiMessage);
         }
 
         // 422 sur le seul champ code : le spectateur a saisi n'importe quoi, ce n'est pas une panne
@@ -257,6 +258,55 @@ final class TickAfrica
         // 401 (clé), 403 (portée manquante), 404 (événement inconnu)… : problème de configuration
         $this->logger->log(\in_array($status, [401, 403, 404, 422], true) ? 'critical' : 'error', 'Tick Africa a répondu {status} {error} : {message}', $context);
 
-        throw new TickAfricaUnavailable(sprintf('Tick Africa a répondu %d (%s).', $status, $error), 422 === $status ? 0 : $status, null, $error, $fieldErrors);
+        throw new TickAfricaUnavailable(sprintf('Tick Africa a répondu %d (%s).', $status, $error), 422 === $status ? 0 : $status, null, $error, $fieldErrors, $apiMessage);
+    }
+
+    /**
+     * Vérifie chaque portée de la clé SANS rien créer ni consommer :
+     * - events:read     GET /events
+     * - orders:write    POST /orders avec un corps vide : 422 (refusé pour données invalides) = autorisé, 403 = portée absente
+     * - orders:read     GET /orders?per_page=1
+     * - tickets:validate POST /tickets/check sur un code bidon (vérification seule, rien n'est enregistré)
+     *
+     * @return array<string, array{ok: bool|null, detail: string}> ok = null si le résultat n'est pas concluant
+     */
+    public function diagnose(): array
+    {
+        $probes = [
+            'events:read' => ['GET', '/events', ['query' => ['per_page' => 1]]],
+            'orders:write' => ['POST', '/orders', ['json' => new \stdClass(), 'headers' => ['Idempotency-Key' => 'diagnostic-'.bin2hex(random_bytes(8))]]],
+            'orders:read' => ['GET', '/orders', ['query' => ['per_page' => 1]]],
+            'tickets:validate' => ['POST', '/tickets/check', ['json' => ['code' => 'DIAGNOSTIC']]],
+        ];
+
+        $results = [];
+        foreach ($probes as $scope => [$method, $path, $options]) {
+            if (!$this->isConfigured()) {
+                $results[$scope] = ['ok' => false, 'detail' => 'Aucune clé.'];
+                continue;
+            }
+            try {
+                $options['headers'] = ($options['headers'] ?? []) + ['Accept' => 'application/json'];
+                $response = $this->http->request($method, rtrim($this->apiUrl, '/').$path, $options + ['auth_bearer' => $this->key(), 'timeout' => 8, 'max_duration' => 12]);
+                $status = $response->getStatusCode();
+                $data = $response->toArray(false);
+            } catch (TransportExceptionInterface|DecodingExceptionInterface $e) {
+                $results[$scope] = ['ok' => null, 'detail' => 'Tick Africa ne répond pas ('.$e->getMessage().').'];
+                continue;
+            }
+
+            $error = \is_string($data['error'] ?? null) ? $data['error'] : '';
+            $message = \is_string($data['message'] ?? null) ? $data['message'] : '';
+            $results[$scope] = match (true) {
+                401 === $status => ['ok' => false, 'detail' => 'Clé refusée (401 '.$error.').'],
+                403 === $status => ['ok' => false, 'detail' => 'Portée absente (403 '.$error.') '.$message],
+                // POST /orders vide : la requête passe le contrôle d'accès puis échoue à la validation
+                200 === $status, 201 === $status, 422 === $status, 409 === $status => ['ok' => true, 'detail' => 'Autorisé (réponse '.$status.').'],
+                429 === $status => ['ok' => null, 'detail' => 'Trop de requêtes, réessayez dans une minute.'],
+                default => ['ok' => null, 'detail' => sprintf('Réponse inattendue %d %s %s', $status, $error, $message)],
+            };
+        }
+
+        return $results;
     }
 }

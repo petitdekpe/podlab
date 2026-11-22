@@ -1542,6 +1542,8 @@ input:focus-visible {
 }
 .adm-row > div { display: flex; flex-direction: column; gap: 6px; }
 
+.adm-diag { margin-top: 16px; }
+
 /* séances de la billetterie (Paramètres) */
 .adm-seance {
     margin: 0;

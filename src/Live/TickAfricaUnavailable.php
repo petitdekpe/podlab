@@ -22,6 +22,8 @@ final class TickAfricaUnavailable extends \RuntimeException
         ?\Throwable $previous = null,
         public readonly string $apiError = '',
         public readonly array $fieldErrors = [],
+        /** Message de Tick Africa, destiné à un humain (pour l'administration) */
+        public readonly string $apiMessage = '',
     ) {
         parent::__construct($message, $code, $previous);
     }
