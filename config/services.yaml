@@ -32,8 +32,21 @@ services:
             $liveTicketUrl: '%env(string:LIVE_TICKETS_URL)%'
             $tickafricaEventId: '%env(string:TICKAFRICA_EVENT_ID)%'
 
-    # API Organisateur Tick Africa : validation des billets du direct
+    # Chiffrement des secrets enregistrés en base (clé API saisie dans /admin)
+    App\Live\SecretBox:
+        arguments:
+            $appSecret: '%kernel.secret%'
+
+    # API Organisateur Tick Africa : billetterie des séances et validation des billets du direct.
+    # La clé saisie dans /admin remplace TICKAFRICA_API_KEY.
     App\Live\TickAfrica:
         arguments:
             $apiKey: '%env(string:TICKAFRICA_API_KEY)%'
             $apiUrl: '%env(string:TICKAFRICA_API_URL)%'
+
+    # Séances en salle : chacune reliée à son événement Tick Africa
+    App\Billetterie\Billetterie:
+        arguments:
+            $marina22: '%env(string:TICKAFRICA_SEANCE_MARINA_22)%'
+            $marina28: '%env(string:TICKAFRICA_SEANCE_MARINA_28)%'
+            $wologuede28: '%env(string:TICKAFRICA_SEANCE_WOLOGUEDE_28)%'

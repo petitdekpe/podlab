@@ -1,10 +1,10 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Avant-Première Podlab - Majestic Marina{% endblock %}
+{% block title %}Edgar-Yves : Moi, à quatre pattes ?! · Billetterie Podlab au cinéma{% endblock %}
 
 {% block meta %}
-    {% set apercu_titre = 'Avant-Première Podlab' %}
-    {% set apercu_description = "Edgar-Yves : Moi, à quatre pattes ?! Ceci n'est pas un podcast, ceci n'est pas un stand-up, c'est un sit-down. Dimanche 22 novembre 2026, 13h00, Majestic Cinéma, Sofitel Marina, Cotonou." %}
+    {% set apercu_titre = 'Podlab au cinéma : nouvelles séances le 28 novembre' %}
+    {% set apercu_description = "Edgar-Yves : Moi, à quatre pattes ?! Ceci n'est pas un podcast, ceci n'est pas un stand-up, c'est un sit-down. Séance du 22 novembre complète. Nouvelles séances le samedi 28 novembre 2026 à 13h00 au Majestic Marina et au Majestic Wologuèdè, Cotonou." %}
     <meta name="description" content="{{ apercu_description }}">
 
     {# Aperçu du lien (WhatsApp, Facebook, LinkedIn, X…) #}
@@ -21,8 +21,13 @@
     <meta name="twitter:card" content="summary_large_image">
 {% endblock %}
 
-{% set prix = prix_billet|number_format(0, ',', ' ') %}
-{% set debut_iso = debut_projection|date('c') %}
+{# Prix le plus bas parmi les séances en vente (10 000 FCFA tant que Tick Africa n'a rien dit) #}
+{% set prix_min = null %}
+{% for s in seances|filter(s => s.onSale and s.prixMin is not null) %}
+    {% if prix_min is null or s.prixMin < prix_min %}{% set prix_min = s.prixMin %}{% endif %}
+{% endfor %}
+{% set prix = (prix_min ?? 10000)|number_format(0, ',', ' ') %}
+{% set debut_iso = prochaine ? prochaine.startsAt|date('c') : 'now'|date('c') %}
 
 {% set programme = [
     { heure: '12h30', titre: 'Accueil et installation' },
@@ -31,7 +36,7 @@
 ] %}
 
 {% set pour_qui = [
-    'Vous voulez passer un dimanche inoubliable, entre amis, en famille ou en couple.',
+    'Vous voulez passer un après-midi inoubliable, entre amis, en famille ou en couple.',
     "Vous avez envie d'un vrai moment de fou rire.",
     "Vous êtes fan des émissions Podlab ou des spectacles d'Edgar-Yves.",
     "Vous voulez vivre une expérience au-dessus de tout ce que vous avez déjà vécu en podcast.",
@@ -44,10 +49,18 @@
     "Ce que 20 ans en France ne vous apprennent pas sur votre propre pays.",
 ] %}
 
+{% set icone_fleche %}<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>{% endset %}
+{% set icone_lieu %}<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>{% endset %}
+
 {% block body %}
-    {% if redirection_direct %}
-        <div hidden data-controller="reload-at" data-reload-at-at-value="{{ redirection_direct|date('c') }}" data-reload-at-url-value="{{ path('app_live') }}"></div>
+    {% if direct_en_cours %}
+        <a href="{{ path('app_live') }}" class="live-banner">
+            <span class="live-banner__dot" aria-hidden="true"></span>
+            <span>Le direct du 22 novembre est en cours. <strong>Rejoindre le direct</strong></span>
+            {{ icone_fleche }}
+        </a>
     {% endif %}
+
     {# ---------- En-tête ---------- #}
     <header class="container site-header">
         <a href="{{ path('app_home') }}" class="brand" aria-label="Podlab × Bénin Bouge">
@@ -56,36 +69,49 @@
             <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="brand__bb">
         </a>
         <nav class="site-nav" aria-label="Navigation principale">
+            <a href="#le-spectacle" class="site-nav__link">Le spectacle</a>
             <a href="#invite" class="site-nav__link">L'invité</a>
             <a href="#programme" class="site-nav__link">Programme</a>
-            <a href="#lieu" class="site-nav__link">Le lieu</a>
-            <a href="#tarifs" class="site-nav__link">Billet</a>
+            <a href="#lieu" class="site-nav__link">Les salles</a>
             <a href="#reservation" class="btn btn--primary btn--sm">Réserver</a>
         </nav>
     </header>
 
-    <main>
-        {# ---------- Hero ---------- #}
-        <section class="container hero">
-            <p class="hero__kicker">Édition spéciale Podlab × Bénin Bouge</p>
-            <h1 class="hero__title"><span class="hero__line">Edgar-Yves&nbsp;:</span> <span class="hero__line">Moi, à quatre pattes&nbsp;?!</span></h1>
-            <p class="hero__tagline">Ceci n'est pas un podcast. Ceci n'est pas un <span class="nowrap">stand-up</span>. Ceci est un <span class="nowrap">sit-down</span>.</p>
-            <p class="hero__intro">Edgar-Yves vit à l'étranger depuis 20 ans et revient au Bénin de temps à autre. Cette année, lors de son séjour, le pays ne l'a pas raté. Pendant deux heures, il raconte avec Beni Tossou des histoires vécues cette année, qu'il n'a jamais racontées nulle part. Enregistré dans les studios Podlab, projeté sur grand écran en partenariat avec Bénin Bouge.</p>
-
-            <div class="facts">
-                <div class="fact card">
-                    <p class="label">Date</p>
-                    <p class="fact__value">Dimanche 22 novembre 2026</p>
-                </div>
-                <div class="fact card">
-                    <p class="label">Heure</p>
-                    <p class="fact__value">13h00<br><span class="fact__note">Ouverture des portes à 12h30</span></p>
-                </div>
-                <div class="fact card">
-                    <p class="label">Lieu</p>
-                    <p class="fact__value">Majestic Cinéma,&nbsp;<br>Sofitel Marina, Cotonou</p>
+    <main data-controller="booking">
+        {# ---------- Premier écran : l'affiche à gauche, la billetterie à droite ---------- #}
+        <section id="reservation" class="container top">
+            <div class="top__poster">
+                <div class="poster">
+                    <img src="{{ asset('images/affiche-moi-a-quatre-pattes.jpg') }}" alt="Affiche : Podlab en collaboration avec Bénin Bouge présentent « Moi, à quatre pattes ? » avec Edgar-Yves Jr, au Majestic Cinéma. Réservation sur podlab.beninbouge.com" class="media-cover" width="1200" height="1500" fetchpriority="high">
                 </div>
             </div>
+
+            <div class="top__ticketing booking">
+                <div class="top__head">
+                    <p class="eyebrow">Billetterie</p>
+                    <h1 class="top__title">Moi, à quatre pattes&nbsp;?!</h1>
+                </div>
+
+                {{ include('home/_commande.html.twig') }}
+            </div>
+        </section>
+
+        {# ---------- Le spectacle (anciennement le haut de page) ---------- #}
+        <section id="le-spectacle" class="container section intro">
+            <p class="hero__kicker">Édition spéciale Podlab × Bénin Bouge</p>
+            <h2 class="hero__tagline intro__tagline">Ceci n'est pas un podcast. Ceci n'est pas un <span class="nowrap">stand-up</span>. Ceci est un <span class="nowrap">sit-down</span>.</h2>
+            <p class="hero__intro">Edgar-Yves vit à l'étranger depuis 20 ans et revient au Bénin de temps à autre. Cette année, lors de son séjour, le pays ne l'a pas raté. Pendant deux heures, il raconte avec Beni Tossou des histoires vécues cette année, qu'il n'a jamais racontées nulle part. Enregistré dans les studios Podlab, projeté sur grand écran en partenariat avec Bénin Bouge.</p>
+
+            {# Les séances en un coup d'œil #}
+            <ul class="seance-strip" aria-label="Les séances">
+                {% for s in seances %}
+                    <li class="seance-strip__item card{{ s.soldOut ? ' is-soldout' }}">
+                        <p class="label">{{ s.jourCourt }} · {{ s.heure }}</p>
+                        <p class="seance-strip__venue">{{ s.salle.name }}</p>
+                        {{ include('home/_statut.html.twig', { s: s }) }}
+                    </li>
+                {% endfor %}
+            </ul>
 
             {# Trailer : se lance au clic (aucun démarrage automatique). Si on dépasse la vidéo en cours de lecture,
                le lecteur passe en miniature dans le coin de l'écran #}
@@ -112,10 +138,12 @@
                 <p class="trailer__placeholder" aria-hidden="true">La bande-annonce continue dans le coin de l'écran</p>
             </div>
 
-            {# Décompte #}
+            {# Décompte jusqu'à la prochaine séance #}
             <div class="countdown" data-controller="countdown" data-countdown-target-value="{{ debut_iso }}">
                 <div data-countdown-target="running" {{ decompte.ended ? 'hidden' }}>
-                    <p class="countdown__heading">Début de la projection dans</p>
+                    <p class="countdown__heading">
+                        {% if prochaine %}Prochaine séance · {{ prochaine.jourCourt }} · {{ prochaine.heure }}{% else %}Prochaine séance{% endif %}
+                    </p>
                     <div class="countdown__grid" role="timer" aria-live="off">
                         <div class="countdown__unit">
                             <p class="countdown__value" data-countdown-target="days">{{ decompte.d }}</p>
@@ -136,32 +164,22 @@
                     </div>
                 </div>
                 <div data-countdown-target="ended" {{ decompte.ended ? '' : 'hidden' }}>
-                    <p class="countdown__ended-title">La projection a commencé.</p>
+                    <p class="countdown__ended-title">La séance a commencé.</p>
                     <p class="countdown__ended-text">Merci d'avoir été là. Suivez Podlab pour la prochaine séance.</p>
                 </div>
             </div>
 
             <div class="hero__cta">
-                {% if soldout %}
-                    <button type="button" class="btn btn--primary btn--lg" data-open-modal="live-tickets">
-                        Sold out · Suivre le direct en ligne
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                    </button>
-                    <span class="hero__cta-note">Toutes les places en salle sont vendues.</span>
-                {% else %}
+                {% if en_vente %}
                     <a href="#reservation" class="btn btn--primary btn--lg">
-                        Je réserve ma place — {{ prix }}&nbsp;FCFA
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        Je réserve pour le 28 novembre · dès {{ prix }}&nbsp;FCFA
+                        {{ icone_fleche }}
                     </a>
-                    <span class="hero__cta-note">Places limitées.</span>
+                    <span class="hero__cta-note">Mobile Money ou carte · billet envoyé par e-mail.</span>
                 {% endif %}
-            </div>
-        </section>
-
-        {# ---------- Affiche de l'événement ---------- #}
-        <section class="container">
-            <div class="poster">
-                <img src="{{ asset('images/affiche-moi-a-quatre-pattes.jpg') }}" alt="Affiche : Podlab en collaboration avec Bénin Bouge présentent « Moi, à quatre pattes ? » avec Edgar-Yves Jr, dimanche 22 novembre 2026 de 13h à 15h au Majestic Cinéma, Sofitel Cotonou Marina. Réservation sur podlab.beninbouge.com" class="media-cover">
+                {% if seance_direct %}
+                    <button type="button" class="btn btn--outline btn--lg" data-open-modal="live-tickets">Le 22, suivre le direct en ligne</button>
+                {% endif %}
             </div>
         </section>
 
@@ -188,7 +206,7 @@
         <section id="invite" class="container section">
             <div class="split guest card">
                 <div class="guest__media">
-                    <img src="{{ asset('images/edgar-yves.jpg') }}" alt="L'humoriste Edgar-Yves, éclat de rire, en noir et blanc" class="media-cover">
+                    <img src="{{ asset('images/edgar-yves.jpg') }}" alt="L'humoriste Edgar-Yves, éclat de rire, en noir et blanc" class="media-cover" loading="lazy">
                     <p class="pill pill--accent">Invité d'honneur</p>
                 </div>
                 <div class="guest__body">
@@ -232,7 +250,7 @@
         {# ---------- Programme ---------- #}
         <section id="programme" class="container section">
             <p class="eyebrow">Programme</p>
-            <h2 class="h2 u-mb-40">Le déroulé de l'après-midi</h2>
+            <h2 class="h2 u-mb-40">Le déroulé de chaque séance</h2>
             <div class="schedule">
                 {% for etape in programme %}
                     <div class="schedule__row{{ etape.highlight|default(false) ? ' schedule__row--highlight' }}">
@@ -246,103 +264,38 @@
             </div>
         </section>
 
-        {# ---------- Lieu ---------- #}
+        {# ---------- Les salles ---------- #}
         <section id="lieu" class="container section">
-            <div class="split venue">
-                <div class="venue__info">
-                    <p class="eyebrow">Le lieu</p>
-                    <h2 class="venue__name">Majestic Cinéma</h2>
-                    <p class="venue__sub">Sofitel Marina Hotel</p>
-                    <p class="venue__address">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
-                        Boulevard de la Marina, Cotonou
-                    </p>
-                    <p class="venue__lead">Fauteuils de cinéma, grand écran, son de salle&nbsp;: le cadre d'une vraie première.</p>
-                    <a href="https://www.google.com/maps/search/?api=1&amp;query={{ 'Sofitel Cotonou Marina Hotel, Boulevard de la Marina, Cotonou'|url_encode }}" target="_blank" rel="noopener" class="btn btn--dark btn--md">Ouvrir dans Google Maps</a>
-                </div>
-                <div class="venue__media">
-                    <img src="{{ asset('images/salle-majestic-marina.webp') }}" alt="Fauteuils en velours rouge avec tablettes, salle du Majestic Marina" class="media-cover" loading="lazy">
-                </div>
-            </div>
-        </section>
-
-        {# ---------- Billet ---------- #}
-        <section id="tarifs" class="container section">
-            <div class="split tickets">
-                <div>
-                    <p class="eyebrow">Billet</p>
-                    <h2 class="h2 u-mb-16">Votre place pour l'Édition Spéciale</h2>
-                    <p class="lead">Seulement 75 places. Une fois la salle pleine, les réservations ferment.</p>
-                </div>
-                <div class="ticket">
-                    <div class="ticket__head">
-                        <p class="ticket__kind">Billet unique{% if soldout %} <span class="soldout-tag">Sold out</span>{% endif %}</p>
-                        <p class="ticket__date">Dim. 22 nov. · 13h00</p>
-                    </div>
-                    <p class="ticket__price">{{ prix }} <span class="ticket__currency">FCFA</span></p>
-                    <div class="ticket__divider"></div>
-                    <ul class="ticket__perks">
-                        <li>2 heures d'histoires inédites avec Edgar-Yves et Beni Tossou</li>
-                        <li>Dimanche 22 novembre, 13h00 précises</li>
-                    </ul>
-                    {% if soldout %}
-                        <button type="button" class="btn btn--primary btn--lg btn--block" data-open-modal="live-tickets">Accès au direct, le même jour</button>
-                    {% else %}
-                        <a href="#reservation" class="btn btn--primary btn--lg btn--block">Je réserve ma place</a>
-                    {% endif %}
-                </div>
-            </div>
-        </section>
-
-        {# ---------- Réservation ---------- #}
-        <section id="reservation" class="container section">
-            <div class="split booking">
-                <div>
-                    <p class="eyebrow">Réservation</p>
-                    {% if soldout %}
-                        <h2 class="booking__title">Salle complète</h2>
-                        <p class="booking__note">Toutes les places en salle sont vendues. Le même jour, suivez l'événement en direct, depuis chez vous.</p>
-                    {% else %}
-                        <h2 class="booking__title">Réservez en 2&nbsp;minutes</h2>
-                        <ol class="steps">
-                            <li>Choisissez votre billet.</li>
-                            <li>Payez en ligne.</li>
-                            <li>Recevez votre billet par e-mail et montrez-le à l'entrée.</li>
-                        </ol>
-                        <p class="booking__note">La salle se remplit. Ne soyez pas celui qui l'a vu sur les réseaux après tout le monde.</p>
-                    {% endif %}
-                    <div data-controller="countdown" data-countdown-target-value="{{ debut_iso }}">
-                        <p class="booking__countdown" data-countdown-target="running" {{ decompte.ended ? 'hidden' }}>
-                            Projection dans
-                            <span class="booking__countdown-value"><span data-countdown-target="days">{{ decompte.d }}</span>&nbsp;j <span data-countdown-target="hours">{{ decompte.h }}</span>&nbsp;h <span data-countdown-target="minutes">{{ decompte.m }}</span>&nbsp;min <span data-countdown-target="seconds">{{ decompte.s }}</span>&nbsp;s</span>
-                        </p>
-                    </div>
-                </div>
-
-                {# Billetterie tick.africa : la couleur primaire reprend l'accent du site (#F5B82E) #}
-                <div class="booking__embed{{ soldout ? ' is-soldout' }}" data-controller="tickafrica">
-                    {# Complet : le formulaire reste visible, flouté et inactif, sous le filtre « Sold out » #}
-                    <div class="booking__frame"{% if soldout %} inert aria-hidden="true"{% endif %}>
-                        <iframe
-                            src="https://tick.africa/embed/podlab-au-cinema?primary=F5B82E"
-                            title="Billetterie Podlab au Cinéma"
-                            class="booking__iframe"
-                            height="120"
-                            loading="lazy"
-                            data-tickafrica-target="frame"
-                        ></iframe>
-                    </div>
-
-                    {% if soldout %}
-                        <div class="soldout" role="region" aria-label="Billetterie en salle complète">
-                            <p class="soldout__badge">Sold out</p>
-                            <p class="soldout__text">Toutes les places en salle sont vendues.</p>
-                            <button type="button" class="btn btn--primary" data-open-modal="live-tickets">Acheter un accès au direct</button>
-                            <p class="soldout__sub">Le même jour, en ligne, depuis chez vous.</p>
+            <p class="eyebrow">Les salles</p>
+            <h2 class="h2 u-mb-40">Deux cinémas Majestic à Cotonou</h2>
+            <div class="venues">
+                {% for cle, salle in {
+                    marina: { photo: 'images/salle-majestic-marina.webp', alt: 'Fauteuils en velours rouge avec tablettes, salle du Majestic Marina' },
+                    wologuede: { photo: null },
+                } %}
+                    {% set lieu = attribute(constant('App\\Billetterie\\Billetterie::SALLES'), cle) %}
+                    {% set info = seances|filter(s => s.salle.name == lieu.name) %}
+                    <article class="venue-card">
+                        {% if salle.photo %}
+                            <div class="venue-card__media">
+                                <img src="{{ asset(salle.photo) }}" alt="{{ salle.alt }}" class="media-cover" loading="lazy">
+                            </div>
+                        {% endif %}
+                        <div class="venue-card__info">
+                            <h3 class="venue-card__name">{{ lieu.name }}</h3>
+                            <p class="venue-card__sub">{{ lieu.sub }}</p>
+                            <p class="venue__address">{{ icone_lieu }} {{ lieu.address }}</p>
+                            <ul class="venue-card__dates">
+                                {% for s in info %}
+                                    <li>{{ s.jour }} · {{ s.heure }}{% if s.soldOut %} <span class="soldout-tag soldout-tag--ink">Sold out</span>{% endif %}</li>
+                                {% endfor %}
+                            </ul>
+                            <a href="https://www.google.com/maps/search/?api=1&amp;query={{ lieu.maps|url_encode }}" target="_blank" rel="noopener" class="btn btn--dark btn--md">Ouvrir dans Google Maps</a>
                         </div>
-                    {% endif %}
-                </div>
+                    </article>
+                {% endfor %}
             </div>
+            <p class="venues__lead">Fauteuils de cinéma, grand écran, son de salle&nbsp;: le cadre d'une vraie première.</p>
         </section>
 
         {# ---------- Partenaires ---------- #}
@@ -370,25 +323,27 @@
         </section>
     </main>
 
-    {# Barre d'action collante (mobile) : visible une fois le hero passé, masquée près de la billetterie #}
-    <div class="sticky-cta" data-controller="sticky-cta" data-sticky-cta-watch-value='[".hero__cta", "#reservation"]'>
-        {% if soldout %}
+    {# Barre d'action collante (mobile) : visible une fois la billetterie du haut dépassée #}
+    <div class="sticky-cta" data-controller="sticky-cta" data-sticky-cta-watch-value='["#reservation", ".hero__cta"]'>
+        {% if en_vente %}
+            <a href="#reservation" class="btn btn--primary">Réserver le 28 nov. · dès {{ prix }}&nbsp;FCFA</a>
+        {% elseif seance_direct %}
             <button type="button" class="btn btn--primary" data-open-modal="live-tickets">Sold out · Suivre le direct</button>
         {% else %}
-            <a href="#reservation" class="btn btn--primary">Réserver · {{ prix }}&nbsp;FCFA</a>
+            <a href="#reservation" class="btn btn--primary">Voir la billetterie</a>
         {% endif %}
     </div>
 
-    {# ---------- Pop-up : annonce du Sold out + principe du direct (3 validations) + achat ----------
-         S'ouvre toute seule à l'arrivée sur la page (une fois par visite) quand la salle est complète,
-         et à chaque clic sur un bouton data-open-modal="live-tickets".
+    {# ---------- Pop-up : accès au direct du 22 novembre (3 validations) + achat ----------
+         S'ouvre à chaque clic sur un bouton data-open-modal="live-tickets" (plus d'ouverture
+         automatique : la page met désormais en avant les séances du 28).
          Parcours : annonce → 1. principe → 2. règles → 3. engagement → achat (formulaire Tickafrica). #}
+    {% if seance_direct %}
     <dialog
         class="modal"
         data-controller="modal steps"
         data-modal-id-value="live-tickets"
-        data-modal-auto-open-value="{{ soldout ? 'true' : 'false' }}"
-        data-modal-once-key-value="soldout-announcement"
+        data-modal-auto-open-value="false"
         data-steps-storage-key-value="live-purchase-steps"
         data-action="click->modal#backdrop close->modal#closed close->steps#reset change->steps#sync"
         aria-labelledby="live-tickets-title"
@@ -400,17 +355,16 @@
 
             {# ===== Annonce ===== #}
             <section class="step" data-steps-target="panel">
-                {% if soldout %}<p class="modal__badge">Sold out</p>{% endif %}
-                <p class="eyebrow">{{ soldout ? 'Salle complète' : 'Accès au direct' }}</p>
-                <h2 id="live-tickets-title" class="modal__title" tabindex="-1">{{ soldout ? 'Toutes les places en salle sont vendues' : 'Suivez l\'événement en direct' }}</h2>
+                <p class="modal__badge">Sold out</p>
+                <p class="eyebrow">Dimanche 22 novembre · Majestic Marina</p>
+                <h2 id="live-tickets-title" class="modal__title" tabindex="-1">La séance du 22 est complète</h2>
                 <p class="modal__text">
-                    {% if soldout %}
-                        Mais vous pouvez vivre « Moi, à quatre pattes&nbsp;?! » en direct, depuis chez vous&nbsp;: <strong>l'accès au direct est en vente</strong>, le dimanche 22 novembre 2026, <strong>aux mêmes heures que la projection (13h00 – 15h00, heure du Bénin)</strong>.
-                    {% else %}
-                        Vivez « Moi, à quatre pattes&nbsp;?! » en direct, depuis chez vous, le dimanche 22 novembre 2026 de 13h00 à 15h00 (heure du Bénin).
-                    {% endif %}
+                    Mais vous pouvez la vivre en direct, depuis chez vous&nbsp;: <strong>l'accès au direct est en vente</strong>, le dimanche 22 novembre 2026, <strong>aux mêmes heures que la projection (13h00 – 15h00, heure du Bénin)</strong>.
                 </p>
                 <p class="modal__text">Avant d'acheter, prenez une minute pour comprendre comment fonctionne le direct&nbsp;: trois courtes étapes.</p>
+                {% if en_vente %}
+                    <p class="modal__text">Vous préférez la salle&nbsp;? <a href="#reservation" data-action="modal#close">Il reste des places le samedi 28 novembre</a>.</p>
+                {% endif %}
                 <div class="step__actions">
                     <button type="button" class="btn btn--primary" data-action="steps#start">Acheter un accès au direct</button>
                     <button type="button" class="btn btn--quiet" data-action="modal#close">Plus tard</button>
@@ -503,6 +457,7 @@
             </section>
         </div>
     </dialog>
+    {% endif %}
 
     {# ---------- Footer ---------- #}
     <footer class="container site-footer">
@@ -511,6 +466,6 @@
             <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="site-footer__bb" loading="lazy">
             <span>Une Édition Spéciale Podlab × Bénin Bouge, en partenariat avec Majestic Bénin et Tick Africa, sponsors officiels.</span>
         </div>
-        <span>Une question&nbsp;? Écrivez-nous sur WhatsApp au 0166617878 ou à contact@beninbouge.com.
+        <span>Une question&nbsp;? Écrivez-nous sur WhatsApp au 0166617878 ou à contact@beninbouge.com.</span>
     </footer>
 {% endblock %}

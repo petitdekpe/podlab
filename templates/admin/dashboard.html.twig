@@ -16,7 +16,7 @@
                 Du {{ opens_at|date('d/m/Y H:i', 'Africa/Porto-Novo') }} au {{ ends_at|date('d/m/Y H:i', 'Africa/Porto-Novo') }} (heure du Bénin)
             </p>
             {% if not enabled %}<p class="adm-alert adm-alert--error">L'interrupteur « accès ouvert » est désactivé : aucun billet ne donne accès.</p>{% endif %}
-            {% if not tickafrica_key %}<p class="adm-alert adm-alert--error">Aucune clé API Tick Africa (variable TICKAFRICA_API_KEY) : aucun nouveau billet ne peut être validé.</p>{% elseif tickafrica_test %}<p class="adm-alert adm-alert--error">La clé Tick Africa est une clé de <strong>test</strong> : seuls les billets de test sont acceptés.</p>{% endif %}
+            {% if not tickafrica_key %}<p class="adm-alert adm-alert--error">Aucune clé API Tick Africa : aucun nouveau billet ne peut être validé et la billetterie des séances est à l'arrêt. <a href="{{ path('app_admin_settings') }}">Saisir la clé</a></p>{% elseif tickafrica_test %}<p class="adm-alert adm-alert--error">La clé Tick Africa est une clé de <strong>test</strong> : seuls les billets de test sont acceptés.</p>{% endif %}
             {% if not tickafrica_event %}<p class="adm-alert adm-alert--error">L'événement Tick Africa du direct n'est pas renseigné : aucun nouveau billet ne peut être validé. <a href="{{ path('app_admin_settings') }}">Le renseigner</a></p>{% endif %}
             {% if not youtube_ok %}<p class="adm-alert adm-alert--error">Aucune vidéo YouTube n'est configurée. <a href="{{ path('app_admin_settings') }}">Renseigner le lien</a></p>{% endif %}
         </article>

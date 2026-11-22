@@ -17,10 +17,54 @@ final class LiveSettings
     /** @var array<string, string|null>|null */
     private ?array $values = null;
 
+    /** Séances du site dont l'événement Tick Africa se règle dans /admin */
+    public const SEANCES = ['marina-22', 'marina-28', 'wologuede-28'];
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly LiveConfig $defaults,
+        private readonly ?SecretBox $secrets = null,
     ) {
+    }
+
+    /** Clé API Tick Africa saisie dans /admin (déchiffrée), ou null. */
+    public function tickafricaApiKey(): ?string
+    {
+        $sealed = (string) $this->get('tickafrica_api_key');
+        if ('' === $sealed || null === $this->secrets) {
+            return null;
+        }
+
+        return $this->secrets->open($sealed);
+    }
+
+    /** Une clé est enregistrée dans /admin mais ne se déchiffre plus (APP_SECRET changé). */
+    public function tickafricaApiKeyUnreadable(): bool
+    {
+        return '' !== (string) $this->get('tickafrica_api_key') && null === $this->tickafricaApiKey();
+    }
+
+    /** @param string|null $apiKey null = retirer la clé de /admin (retour à TICKAFRICA_API_KEY) */
+    public function setTickafricaApiKey(#[\SensitiveParameter] ?string $apiKey): void
+    {
+        if (null !== $apiKey && null === $this->secrets) {
+            throw new \LogicException('Chiffrement indisponible.');
+        }
+        $this->set('tickafrica_api_key', null === $apiKey ? null : $this->secrets->seal($apiKey));
+    }
+
+    public function canStoreSecrets(): bool
+    {
+        return null !== $this->secrets && $this->secrets->isUsable();
+    }
+
+    /**
+     * Événement Tick Africa d'une séance saisi dans /admin : « uuid » ou
+     * « uuid:uuid-tarif,uuid-tarif ». '' s'il n'est pas défini.
+     */
+    public function seanceLink(string $seance): string
+    {
+        return trim((string) $this->get('seance_'.$seance));
     }
 
     public function title(): string

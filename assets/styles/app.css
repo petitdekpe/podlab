@@ -1063,7 +1063,6 @@ input:focus-visible {
     .site-footer { padding-top: 40px; padding-bottom: 104px; flex-direction: column; align-items: flex-start; }
 
     /* --- Contenu allégé sur mobile (doublons ou secondaire) --- */
-    #tarifs,                  /* la billetterie intégrée affiche déjà le billet et le prix */
     .venue__media,            /* même photo que le bandeau en haut de page */
     .audience__cta,
     .booking__countdown,      /* le décompte est déjà dans le hero */
@@ -1543,6 +1542,30 @@ input:focus-visible {
 }
 .adm-row > div { display: flex; flex-direction: column; gap: 6px; }
 
+/* séances de la billetterie (Paramètres) */
+.adm-seance {
+    margin: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+.adm-seance__title { padding: 0 6px; font-weight: 700; }
+.adm-seance__state {
+    margin-left: 8px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border-strong);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-subtle);
+}
+.adm-seance__state--en_vente { color: #BFEBD0; border-color: rgba(60, 179, 113, 0.5); }
+.adm-seance__state--complet { color: #FFB4A6; border-color: rgba(255, 99, 71, 0.5); }
+
 .adm-check {
     display: flex;
     align-items: flex-start;
@@ -1935,3 +1958,570 @@ html.is-modal-open { overflow: hidden; }
 
 .modal__title--compact { font-size: clamp(1.35rem, 3.5vw, 1.75rem); }
 .modal__embed { margin-top: 14px; }
+
+/* ==========================================================================
+   Billetterie des séances (API Tick Africa)
+   ========================================================================== */
+/* --- premier écran : affiche à gauche, billetterie à droite --- */
+/*
+ * Largeur de l'affiche : elle tient entière dans la hauteur de l'écran
+ * (en-tête déduit), sans dépasser 440px ni 42% de la page. Format 4:5, jamais recadrée.
+ */
+.top {
+    --poster-w: min(440px, 42vw, calc((100vh - 170px) * 0.8));
+    --poster-w: min(440px, 42vw, calc((100svh - 170px) * 0.8));
+    padding-top: 16px;
+    display: grid;
+    grid-template-columns: var(--poster-w) minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+}
+/* l'affiche reste à l'écran pendant qu'on remplit le formulaire */
+.top__poster { position: sticky; top: 24px; }
+.top__poster .poster { width: 100%; max-width: none; margin: 0; border-radius: 20px; }
+
+.top__ticketing {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 32px 36px;
+}
+.top__head .eyebrow { margin-bottom: 10px; }
+.top__title {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(1.9rem, 3.2vw, 2.75rem);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+}
+.top__lead { margin-top: 12px; color: var(--color-ink-muted); }
+.top__lead strong { color: var(--color-bg); }
+.top__tick {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--color-ink-muted);
+}
+.top__tick .tick-inline { padding: 0; height: 26px; }
+
+/* --- cadrans des séances --- */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.dials {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+.dial { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.dial__label {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 18px 10px 16px;
+    border-radius: 18px;
+    border: 2px solid var(--color-input-border);
+    background: #FFFFFF;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.dial__label:hover { border-color: var(--color-bg); }
+.dial__input { position: absolute; opacity: 0; pointer-events: none; }
+.dial__label:has(.dial__input:focus-visible) { outline: 2px solid var(--color-eyebrow-on-cream); outline-offset: 3px; }
+
+/* séance choisie : le cadran passe en noir, accent jaune */
+.dial__label:has(.dial__input:checked) {
+    border-color: var(--color-bg);
+    background: var(--color-bg);
+    color: var(--color-text);
+    transform: translateY(-2px);
+}
+.dial__label:has(.dial__input:checked) .dial__day,
+.dial__label:has(.dial__input:checked) .dial__price { color: var(--color-accent); }
+.dial__label:has(.dial__input:checked) .dial__meta,
+.dial__label:has(.dial__input:checked) .dial__weekday,
+.dial__label:has(.dial__input:checked) .dial__month { color: var(--color-text-subtle); }
+
+.dial__date { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.dial__weekday,
+.dial__month { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-ink-muted); }
+.dial__day { margin: 4px 0; font-family: var(--font-display); font-size: 52px; font-weight: 800; letter-spacing: -0.03em; }
+.dial__venue { font-family: var(--font-display); font-size: 19px; font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
+.dial__brand { display: block; font-family: var(--font-body); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; }
+.dial__meta { font-size: 13px; color: var(--color-ink-muted); }
+.dial__foot { margin-top: auto; padding-top: 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 40px; justify-content: center; }
+.dial__price { font-size: 17px; font-weight: 800; white-space: nowrap; }
+.dial__left { font-size: 12px; font-weight: 700; color: var(--color-eyebrow-on-cream); }
+
+/* complet : grisé, tampon rouge */
+.dial.is-disabled .dial__label { cursor: not-allowed; background: var(--color-cream-2); border-color: transparent; }
+.dial.is-soldout .dial__date,
+.dial.is-soldout .dial__venue,
+.dial.is-soldout .dial__meta { opacity: 0.45; }
+.dial__stamp {
+    padding: 2px 10px;
+    border: 2.5px solid #C2392B;
+    border-radius: 8px;
+    color: #C2392B;
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transform: rotate(-6deg);
+}
+.dial__live {
+    padding: 8px 4px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--color-bg);
+    color: var(--color-accent);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.dial__live:hover { color: var(--color-accent-hover); }
+
+.order__details { display: flex; flex-direction: column; gap: 22px; }
+.order__soon { font-weight: 600; color: var(--color-eyebrow-on-cream); }
+.order__secure { align-items: center; flex-wrap: wrap; }
+.order__secure svg { margin-top: 0; }
+.order__secure .tick-inline { height: 24px; padding: 0; background: none; }
+
+@media (max-width: 420px) {
+    .dials { gap: 6px; }
+    .dial__label { padding: 14px 4px 12px; border-radius: 14px; }
+    .dial__day { font-size: 40px; }
+    .dial__venue { font-size: 15px; }
+    .dial__meta { font-size: 11px; }
+    .dial__price { font-size: 14px; }
+    .dial__stamp { font-size: 13px; padding: 2px 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dial__label { transition: none; }
+    .dial__label:has(.dial__input:checked) { transform: none; }
+}
+
+.option__live {
+    align-self: flex-start;
+    margin: -2px 0 4px;
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    color: #B0281A;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.option__live:hover { color: #7A1A10; }
+
+.intro__tagline { margin-top: 0; }
+
+@media (max-width: 900px) {
+    /* empilé : l'affiche réduite, pour laisser la billetterie apparaître dès l'ouverture */
+    .top { grid-template-columns: 1fr; gap: 20px; }
+    .top__poster {
+        position: static;
+        width: min(100%, 360px, calc(48vh * 0.8));
+        width: min(100%, 360px, calc(48svh * 0.8));
+        margin: 0 auto;
+    }
+}
+
+@media (max-width: 640px) {
+    .top { padding-top: 4px; }
+    .top__ticketing { padding: 24px 16px; gap: 20px; border-radius: 18px; }
+    .top__ticketing > :first-child { padding: 0; }
+}
+
+/* --- bandeau « direct en cours » --- */
+.live-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px var(--gutter);
+    background: var(--color-soldout);
+    color: var(--color-bg);
+    font-weight: 600;
+    text-decoration: none;
+}
+.live-banner:hover { color: var(--color-bg); background: #FF8577; }
+.live-banner__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-bg);
+    animation: live-pulse 1.4s ease-in-out infinite;
+}
+@keyframes live-pulse { 50% { opacity: 0.25; } }
+
+/* --- pastilles d'état --- */
+.status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-subtle);
+}
+.status::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+.status--open { color: #7BD88F; }
+.status--hot { color: var(--color-accent); }
+.status--soldout { color: var(--color-soldout); }
+
+/* --- séances en un coup d'œil (hero) --- */
+.seance-strip {
+    margin: 40px 0 0;
+    padding: 0;
+    list-style: none;
+    max-width: 920px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    gap: 12px;
+}
+.seance-strip__item {
+    padding: 16px 20px;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.seance-strip__item.is-soldout { opacity: 0.75; }
+.seance-strip__venue { font-size: 19px; font-weight: 700; }
+
+/* --- en-tête de section avec aparté --- */
+.section-head {
+    margin-bottom: 40px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px 32px;
+}
+.section-head__aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    color: var(--color-text-subtle);
+}
+.tick-inline {
+    height: 30px;
+    width: auto;
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: #FFFFFF;
+}
+
+/* --- cartes de séance --- */
+.seances {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+    gap: 20px;
+}
+.seance {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 20px;
+    padding: 28px;
+    border-radius: 22px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+}
+.seance--on-sale { border: 2px solid var(--color-accent); }
+.seance--soldout { background: var(--color-bg); }
+
+.seance__date {
+    width: 76px;
+    padding: 10px 0;
+    border-radius: 14px;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    text-align: center;
+    line-height: 1;
+}
+.seance--soldout .seance__date { background: var(--color-surface-3); color: var(--color-text-muted); }
+.seance__day { font-family: var(--font-display); font-size: 40px; font-weight: 800; }
+.seance__month { margin-top: 4px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+
+.seance__when { font-size: 14px; font-weight: 600; color: var(--color-text-subtle); }
+.seance__venue {
+    margin: 4px 0 0;
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+}
+.seance__address {
+    margin-top: 10px;
+    display: flex;
+    gap: 6px;
+    font-size: 15px;
+    color: var(--color-text-muted);
+}
+.seance__address svg { flex: none; margin-top: 3px; }
+
+.seance__foot {
+    grid-column: 1 / -1;
+    align-self: end;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 20px;
+    border-top: 1.5px dashed var(--color-border-strong);
+}
+.seance__price { font-size: 16px; color: var(--color-text-muted); }
+.seance__price strong {
+    font-family: var(--font-display);
+    font-size: 34px;
+    font-weight: 800;
+    color: var(--color-text);
+}
+.seance__stamp {
+    align-self: flex-start;
+    padding: 2px 16px;
+    border: 3px solid var(--color-soldout);
+    border-radius: 10px;
+    color: var(--color-soldout);
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transform: rotate(-3deg);
+}
+.seance__note { color: var(--color-text-muted); }
+.seance__note--soon { color: var(--color-accent); font-weight: 600; }
+.seance__stale { font-size: 13px; color: var(--color-text-subtle); }
+
+/* --- formulaire de réservation (panneau crème) --- */
+.order-panel { min-width: 0; }
+
+.order {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+.order__group {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+.order__legend {
+    margin-bottom: 10px;
+    padding: 0;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-eyebrow-on-cream);
+}
+.order__options { display: flex; flex-direction: column; gap: 8px; }
+
+.option {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1.5px solid var(--color-input-border);
+    background: #FFFFFF;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.option:hover { border-color: var(--color-bg); }
+.option:has(input:checked) { border-color: var(--color-bg); box-shadow: inset 0 0 0 1.5px var(--color-bg); }
+.option:has(input:focus-visible) { outline: 2px solid var(--color-eyebrow-on-cream); outline-offset: 2px; }
+.option input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--color-bg); }
+.option.is-disabled { cursor: not-allowed; background: var(--color-cream-2); border-color: transparent; color: var(--color-ink-muted); }
+.option__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.option__when { font-size: 14px; color: var(--color-ink-muted); }
+.option__venue { font-weight: 700; }
+.option__side { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.option__price { font-weight: 700; white-space: nowrap; }
+.option__left { font-size: 13px; font-weight: 600; color: var(--color-eyebrow-on-cream); }
+
+.soldout-tag--ink { margin-left: 0; color: #C2392B; border-color: #C2392B; }
+
+.qty { display: inline-flex; align-items: center; gap: 6px; }
+.qty__btn {
+    width: 48px;
+    height: 48px;
+    border: 1.5px solid var(--color-input-border);
+    border-radius: 50%;
+    background: #FFFFFF;
+    color: var(--color-bg);
+    font-size: 22px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.qty__btn:hover { border-color: var(--color-bg); }
+.qty__input {
+    width: 72px;
+    height: 48px;
+    border: 1.5px solid var(--color-input-border);
+    border-radius: 12px;
+    background: #FFFFFF;
+    color: var(--color-bg);
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+.qty__input::-webkit-inner-spin-button,
+.qty__input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+.order__row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+    gap: 0 12px;
+}
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.field__label { font-size: 15px; font-weight: 600; }
+.field__hint { font-weight: 400; color: var(--color-ink-muted); font-size: 13px; }
+.field__input {
+    min-height: 52px;
+    padding: 0 16px;
+    border: 1.5px solid var(--color-input-border);
+    border-radius: 12px;
+    background: #FFFFFF;
+    color: var(--color-bg);
+}
+.field__input:focus { outline: 2px solid var(--color-bg); outline-offset: 1px; border-color: var(--color-bg); }
+.field__input[aria-invalid="true"] { border-color: #C2392B; }
+
+.order__error { margin-top: 6px; font-size: 14px; font-weight: 600; color: #B0281A; }
+.order__alert {
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1.5px solid #C2392B;
+    background: #FBE4E0;
+    color: #7A1A10;
+    font-weight: 600;
+}
+
+.order__total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-top: 18px;
+    border-top: 1.5px dashed var(--color-input-border);
+    font-size: 18px;
+    font-weight: 600;
+}
+.order__total strong { font-family: var(--font-display); font-size: 32px; font-weight: 800; }
+
+.order .btn--dark { color: var(--color-accent); }
+.order .btn--dark:hover { color: var(--color-accent-hover); }
+.btn.is-busy { opacity: 0.7; cursor: progress; }
+
+.order__secure {
+    display: flex;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--color-ink-muted);
+}
+.order__secure svg { flex: none; margin-top: 3px; }
+
+.order-closed {
+    padding: 28px;
+    border-radius: 16px;
+    background: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+.order-closed__title { font-family: var(--font-display); font-size: 24px; font-weight: 800; }
+
+/* --- les deux salles --- */
+.venues {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+    gap: 20px;
+}
+.venue-card {
+    display: flex;
+    flex-direction: column;
+    border-radius: 24px;
+    overflow: hidden;
+    background: var(--color-accent);
+    color: var(--color-bg);
+}
+.venue-card__media { position: relative; aspect-ratio: 16 / 9; background: var(--color-surface-2); }
+.venue-card__media .media-cover { object-position: 30% 70%; }
+.venue-card__info { flex: 1; display: flex; flex-direction: column; align-items: flex-start; padding: 32px; }
+.venue-card__name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 3.5vw, 2.75rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+.venue-card__sub { margin-top: 10px; font-size: 18px; font-weight: 500; }
+.venue-card__dates { margin: 18px 0 24px; padding-left: 20px; font-weight: 600; }
+.venue-card__info .btn { margin-top: auto; }
+.venue-card .soldout-tag--ink { margin-left: 6px; }
+.venues__lead { margin-top: 20px; color: var(--color-text-muted); }
+
+/* --- page de retour après paiement --- */
+.thanks { padding-top: 32px; padding-bottom: 96px; }
+.thanks__panel { max-width: 620px; }
+.thanks__seance {
+    margin-top: 20px;
+    padding: 14px 16px;
+    border-left: 3px solid var(--color-accent);
+    background: var(--color-bg);
+    font-weight: 700;
+}
+.thanks__seance span { font-weight: 400; color: var(--color-text-muted); }
+
+@media (max-width: 640px) {
+    .seance-strip { margin-top: 28px; grid-template-columns: 1fr; gap: 8px; }
+    .seance-strip__item { padding: 12px 16px; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+    .seance-strip__venue { font-size: 17px; }
+
+    .section-head { margin-bottom: 24px; }
+    .seance { padding: 20px; gap: 16px; border-radius: 18px; }
+    .seance__date { width: 64px; }
+    .seance__day { font-size: 32px; }
+    .seance__venue { font-size: 24px; }
+
+    .option { padding: 12px; gap: 10px; }
+    .venue-card { border-radius: 18px; }
+    .venue-card__info { padding: 24px 20px; }
+    .venue-card__info .btn { width: 100%; }
+    .live-banner { font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .live-banner__dot { animation: none; }
+    .option { transition: none; }
+}

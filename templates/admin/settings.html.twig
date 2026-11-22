@@ -42,25 +42,95 @@
             <span><strong>Filigrane avec le numéro du billet</strong><br><span class="adm-muted">Un texte discret se déplace sur la vidéo : il permet de retrouver l'origine d'un enregistrement partagé.</span></span>
         </label>
 
-        <h2 class="adm-h2 adm-h2--section">Billets Tick Africa</h2>
+        {# Identifiants proposés à la saisie : les événements publiés de la clé #}
+        <datalist id="tickafrica-events">
+            {% for event in tickafrica_events %}<option value="{{ event.id }}">{{ event.label }}</option>{% endfor %}
+        </datalist>
+
+        <h2 class="adm-h2 adm-h2--section">Connexion à Tick Africa</h2>
+
+        <p class="adm-help">
+            Clé utilisée&nbsp;:
+            {% if tickafrica_key_source == 'admin' %}
+                <code>{{ tickafrica_key_masked }}</code>, enregistrée ici{{ tickafrica_test ? ' (clé de test : aucun paiement réel, seuls les billets de test sont acceptés)' : ' (production)' }}.
+            {% elseif tickafrica_key_source == 'env' %}
+                <code>{{ tickafrica_key_masked }}</code>, celle du serveur (variable TICKAFRICA_API_KEY){{ tickafrica_test ? ', clé de test' : '' }}.
+            {% else %}
+                <strong>aucune</strong>. La billetterie et la vérification des billets du direct sont à l'arrêt.
+            {% endif %}
+        </p>
+        {% if tickafrica_key_unreadable %}
+            <p class="adm-alert adm-alert--error">La clé enregistrée ici ne peut plus être lue (APP_SECRET du serveur a changé). Saisissez-la à nouveau.</p>
+        {% endif %}
+
+        <label class="adm-label" for="tickafrica_api_key">{{ tickafrica_key_source == 'admin' ? 'Remplacer la clé API' : 'Clé API Tick Africa' }}</label>
+        <input id="tickafrica_api_key" name="tickafrica_api_key" type="password" class="adm-input" value="" placeholder="ta_live_…" autocomplete="new-password" spellcheck="false"{{ can_store_secrets ? '' : ' disabled' }}>
+        <p class="adm-help">
+            Back-office Tick Africa, onglet « API &amp; intégrations ». Portées nécessaires&nbsp;: <code>events:read</code>, <code>orders:write</code>, <code>orders:read</code> et <code>tickets:validate</code>.
+            Ajoutez aussi sur la clé l'URL de retour <code>{{ url('app_billetterie_merci') }}</code>.
+            La clé est vérifiée auprès de Tick Africa, puis enregistrée chiffrée&nbsp;; elle n'est plus jamais affichée. Laissez le champ vide pour garder la clé actuelle.
+            {% if not can_store_secrets %}<br><strong>Indisponible&nbsp;:</strong> APP_SECRET n'est pas défini sur le serveur (fichier .env.local).{% endif %}
+        </p>
+        {% if tickafrica_key_source == 'admin' %}
+            <label class="adm-check">
+                <input type="checkbox" name="tickafrica_api_key_clear" value="1">
+                <span><strong>Supprimer la clé enregistrée ici</strong><br><span class="adm-muted">Le site reprend alors la clé du serveur (TICKAFRICA_API_KEY), s'il y en a une.</span></span>
+            </label>
+        {% endif %}
+
+        <h2 class="adm-h2 adm-h2--section">Billets du direct</h2>
 
         <label class="adm-label" for="tickafrica_event_id">Identifiant de l'événement « accès au direct »</label>
-        <input id="tickafrica_event_id" name="tickafrica_event_id" type="text" class="adm-input" value="{{ form.tickafrica_event_id }}" placeholder="{{ tickafrica_event_default ?: '9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d' }}" autocomplete="off" spellcheck="false">
+        <input id="tickafrica_event_id" name="tickafrica_event_id" type="text" class="adm-input" list="tickafrica-events" value="{{ form.tickafrica_event_id }}" placeholder="{{ tickafrica_event_default ?: '9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d' }}" autocomplete="off" spellcheck="false">
         <p class="adm-help">
             UUID de l'événement Tick Africa dont les billets ouvrent le direct. Les billets d'un autre événement (la salle, par exemple) sont refusés et ne sont pas consommés.
-            Pour le trouver : <code>php bin/console app:tickafrica:events</code>.
+            {% if tickafrica_events %}Cliquez dans le champ pour choisir parmi vos événements.{% endif %}
             {% if tickafrica_event_default %}Laissé vide, c'est la valeur par défaut du site qui est utilisée : <code>{{ tickafrica_event_default }}</code>{% else %}Tant qu'il est vide, aucun nouveau billet n'est accepté.{% endif %}
         </p>
+
+        <h2 class="adm-h2 adm-h2--section">Billetterie des séances</h2>
         <p class="adm-help">
-            Clé API (variable TICKAFRICA_API_KEY, fichier .env.local du serveur) :
-            {% if not tickafrica_key %}<strong>absente</strong>.{% elseif tickafrica_test %}<strong>clé de test</strong> (seuls les billets de test sont acceptés).{% else %}configurée (production).{% endif %}
+            Reliez chaque séance à son événement Tick Africa{% if tickafrica_events %} (cliquez dans le champ pour choisir parmi vos événements){% endif %}.
+            Si deux séances partagent un même événement, indiquez pour chacune l'identifiant de son billet (plusieurs : séparés par des virgules).
+            Les identifiants des billets s'affichent avec <code>php bin/console app:tickafrica:event &lt;uuid&gt;</code>.
         </p>
 
-        <h2 class="adm-h2 adm-h2--section">Billetterie du site</h2>
+        {% for key, seance in form.seances %}
+            {% set etat = seances_etat[key] ?? null %}
+            <fieldset class="adm-seance">
+                <legend class="adm-seance__title">
+                    {{ seance.label }}
+                    {% if etat %}
+                        <span class="adm-seance__state adm-seance__state--{{ etat.status }}">
+                            {{ {en_vente: 'En vente', complet: 'Complet', passee: 'Terminée', fermee: 'Vente fermée', indisponible: 'Non reliée ou injoignable'}[etat.status] }}
+                        </span>
+                    {% endif %}
+                </legend>
+                <div class="adm-row">
+                    <div>
+                        <label class="adm-label" for="seance-{{ key }}-event">Événement Tick Africa</label>
+                        <input id="seance-{{ key }}-event" name="seances[{{ key }}][event]" type="text" class="adm-input" list="tickafrica-events" value="{{ seance.event }}" placeholder="{{ seance.default ?: 'UUID de l\'événement' }}" autocomplete="off" spellcheck="false">
+                    </div>
+                    <div>
+                        <label class="adm-label" for="seance-{{ key }}-tarifs">Billets à vendre (facultatif)</label>
+                        <input id="seance-{{ key }}-tarifs" name="seances[{{ key }}][tarifs]" type="text" class="adm-input" value="{{ seance.tarifs }}" placeholder="Tous les billets de l'événement" autocomplete="off" spellcheck="false">
+                    </div>
+                </div>
+                {% if etat and etat.tarifs|length > 0 %}
+                    <p class="adm-help">
+                        {% for t in etat.tarifs %}
+                            {{ t.name }} · {{ t.price|number_format(0, ',', ' ') }} FCFA · {{ t.remaining is null ? 'illimité' : t.remaining ~ ' restante(s)' }} · <code>{{ t.id }}</code>{% if not loop.last %}<br>{% endif %}
+                        {% endfor %}
+                    </p>
+                {% elseif not seance.event and seance.default %}
+                    <p class="adm-help">Vide&nbsp;: valeur du serveur utilisée (<code>{{ seance.default }}</code>).</p>
+                {% endif %}
+            </fieldset>
+        {% endfor %}
 
         <label class="adm-check">
             <input type="checkbox" name="soldout" value="1"{{ form.soldout ? ' checked' }}>
-            <span><strong>Billetterie en salle « Sold out »</strong><br><span class="adm-muted">Affiche un filtre « Sold out » sur la billetterie du site. Les boutons « Réserver » ouvrent alors la fenêtre d'achat d'un accès au direct. Décochez pour rouvrir la billetterie en salle.</span></span>
+            <span><strong>Séance du 22 novembre « Sold out »</strong><br><span class="adm-muted">Affiche la séance du 22 au Majestic Marina comme complète, avec le bouton d'achat d'un accès au direct. Les séances du 28 suivent la disponibilité en temps réel de Tick Africa. Décochez pour remettre la séance du 22 en vente (son événement doit alors être renseigné ci-dessus).</span></span>
         </label>
 
         <label class="adm-label" for="live_ticket_url">Billetterie des accès au direct (Tickafrica)</label>

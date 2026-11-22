@@ -1,0 +1,51 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Votre réservation · Podlab au cinéma{% endblock %}
+
+{% block meta %}
+    <meta name="robots" content="noindex">
+    {# Paiement pas encore confirmé : on relit l'état de la commande toutes les 5 secondes (6 fois au plus) #}
+    {% if relance %}<meta http-equiv="refresh" content="5;url={{ path('app_billetterie_merci', { n: n }) }}">{% endif %}
+{% endblock %}
+
+{% block body %}
+    <header class="container site-header">
+        <a href="{{ path('app_home') }}" class="brand" aria-label="Podlab × Bénin Bouge">
+            <img src="{{ asset('images/logo-podlab.jpg') }}" alt="Podlab" class="brand__podlab">
+            <span class="brand__times" aria-hidden="true">×</span>
+            <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="brand__bb">
+        </a>
+    </header>
+
+    <main class="container thanks">
+        <div class="live__panel thanks__panel">
+            {% if statut == 'validated' %}
+                <p class="eyebrow">Paiement confirmé</p>
+                <h1 class="live__panel-title">Merci, votre place est réservée&nbsp;!</h1>
+                <p class="live__panel-text">Vos billets ont été envoyés{% if email %} à <strong>{{ email }}</strong>{% endif %}. Pensez à vérifier vos spams. Montrez-les à l'entrée, sur votre téléphone ou imprimés.</p>
+            {% elseif statut in ['pending', 'processing'] %}
+                <p class="eyebrow">Paiement en cours de confirmation</p>
+                <h1 class="live__panel-title">Encore quelques secondes…</h1>
+                <p class="live__panel-text">Nous attendons la confirmation de votre paiement. Cette page se met à jour toute seule. Dès que c'est confirmé, vos billets partent{% if email %} à <strong>{{ email }}</strong>{% endif %}.</p>
+            {% elseif statut in ['cancelled', 'refunded'] %}
+                <p class="eyebrow">Paiement non abouti</p>
+                <h1 class="live__panel-title">Votre paiement n'est pas passé</h1>
+                <p class="live__panel-text">Vous n'avez pas été débité. Vous pouvez recommencer votre réservation&nbsp;: les places ne sont pas bloquées.</p>
+            {% else %}
+                <p class="eyebrow">Réservation</p>
+                <h1 class="live__panel-title">Merci pour votre réservation&nbsp;!</h1>
+                <p class="live__panel-text">Dès que votre paiement est confirmé, Tick Africa vous envoie vos billets par e-mail{% if email %} à <strong>{{ email }}</strong>{% endif %}. Si rien n'arrive d'ici quelques minutes, vérifiez vos spams puis écrivez-nous.</p>
+            {% endif %}
+
+            {% if seance %}
+                <p class="thanks__seance">{{ seance.jour }} · {{ seance.heure }} · {{ seance.salle.name }}<br><span>{{ seance.salle.sub }}, {{ seance.salle.address }}</span></p>
+                <p class="live__panel-text">Ouverture des portes à 12h30, fermeture à 12h55&nbsp;: aucune entrée après, même avec un billet.</p>
+            {% endif %}
+
+            <a href="{{ path('app_home') }}{{ statut in ['cancelled', 'refunded'] ? '#reservation' }}" class="btn btn--primary">
+                {{ statut in ['cancelled', 'refunded'] ? 'Recommencer ma réservation' : 'Retour au site' }}
+            </a>
+            <p class="live__hint-text">Une question&nbsp;? WhatsApp 0166617878 ou contact@beninbouge.com.</p>
+        </div>
+    </main>
+{% endblock %}

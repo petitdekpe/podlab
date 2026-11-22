@@ -24,18 +24,68 @@ final class TickAfrica
         #[\SensitiveParameter]
         private readonly string $apiKey,
         private readonly string $apiUrl = self::DEFAULT_URL,
+        /** Clé saisie dans /admin : elle remplace celle de l'environnement */
+        private readonly ?LiveSettings $settings = null,
     ) {
     }
 
     public function isConfigured(): bool
     {
-        return '' !== trim($this->apiKey);
+        return '' !== $this->key();
     }
 
     /** Clé de test : elle ne valide que les billets de test. */
     public function isTestMode(): bool
     {
-        return str_starts_with(trim($this->apiKey), 'ta_test_');
+        return str_starts_with($this->key(), 'ta_test_');
+    }
+
+    /** D'où vient la clé utilisée : 'admin', 'env' ou 'none'. */
+    public function keySource(): string
+    {
+        return match (true) {
+            '' !== $this->adminKey() => 'admin',
+            '' !== trim($this->apiKey) => 'env',
+            default => 'none',
+        };
+    }
+
+    /** Fin de la clé, pour la reconnaître sans l'afficher : « ta_live_…a1b2 ». */
+    public function maskedKey(): string
+    {
+        $key = $this->key();
+        if ('' === $key) {
+            return '';
+        }
+        $prefix = preg_match('/^ta_(live|test)_/', $key, $m) ? $m[0] : '';
+
+        return $prefix.'…'.substr($key, -4);
+    }
+
+    /** Même client avec une autre clé : pour vérifier une clé avant de l'enregistrer. */
+    public function withApiKey(#[\SensitiveParameter] string $apiKey): self
+    {
+        return new self($this->http, $this->logger, $apiKey, $this->apiUrl);
+    }
+
+    /** Clé effective : celle de /admin, sinon TICKAFRICA_API_KEY. */
+    private function key(): string
+    {
+        $admin = $this->adminKey();
+
+        return '' !== $admin ? $admin : trim($this->apiKey);
+    }
+
+    private function adminKey(): string
+    {
+        if (null === $this->settings) {
+            return '';
+        }
+        try {
+            return trim((string) $this->settings->tickafricaApiKey());
+        } catch (\Throwable) {
+            return ''; // base indisponible : on se rabat sur l'environnement
+        }
     }
 
     /**
@@ -77,6 +127,60 @@ final class TickAfrica
         return \is_array($data['data'] ?? null) ? array_values($data['data']) : [];
     }
 
+    /**
+     * Un événement, ses dates et ses types de billets avec la disponibilité
+     * en temps réel (portée events:read). 404 si l'événement n'est pas à vous.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws TickAfricaUnavailable
+     */
+    public function event(string $eventId): array
+    {
+        // Lu à chaque affichage de la page (avec cache) : on n'attend pas longtemps
+        $data = $this->request('GET', '/events/'.rawurlencode($eventId), ['timeout' => 4, 'max_duration' => 6]);
+
+        return \is_array($data['data'] ?? null) ? $data['data'] : [];
+    }
+
+    /**
+     * Ouvre un paiement et renvoie le lien vers lequel rediriger l'acheteur
+     * (portée orders:write). Ce n'est PAS une vente : elle n'existe qu'une fois
+     * le paiement confirmé. Rejouer la même clé d'idempotence avec le même
+     * corps rend la réponse d'origine, sans second paiement.
+     *
+     * @param array<string, mixed> $order
+     *
+     * @return array<string, mixed> order_id, reference, status, amount, payment_url…
+     *
+     * @throws TickAfricaUnavailable ($apiError porte le code métier : INSUFFICIENT_STOCK…)
+     */
+    public function createOrder(array $order, string $idempotencyKey): array
+    {
+        $data = $this->request('POST', '/orders', [
+            'json' => $order,
+            'headers' => ['Idempotency-Key' => $idempotencyKey],
+            'timeout' => 15,
+            'max_duration' => 25,
+        ]);
+
+        return \is_array($data['data'] ?? null) ? $data['data'] : [];
+    }
+
+    /**
+     * Une commande, ou le paiement en attente rendu par createOrder() (portée orders:read).
+     *
+     * @return array<string, mixed>
+     *
+     * @throws TickAfricaUnavailable
+     */
+    public function order(string $orderId): array
+    {
+        $data = $this->request('GET', '/orders/'.rawurlencode($orderId), ['timeout' => 5, 'max_duration' => 8]);
+
+        return \is_array($data['data'] ?? null) ? $data['data'] : [];
+    }
+
     private function ticket(string $path, string $code, string $eventId): TicketVerdict
     {
         $body = ['code' => $code];
@@ -107,15 +211,16 @@ final class TickAfrica
     private function request(string $method, string $path, array $options): array
     {
         if (!$this->isConfigured()) {
-            $this->logger->critical('Tick Africa : clé API absente (variable TICKAFRICA_API_KEY).');
+            $this->logger->critical('Tick Africa : clé API absente (/admin > Paramètres, ou variable TICKAFRICA_API_KEY).');
 
             throw new TickAfricaUnavailable('Clé API Tick Africa absente.');
         }
 
+        $options['headers'] = ($options['headers'] ?? []) + ['Accept' => 'application/json'];
+
         try {
             $response = $this->http->request($method, rtrim($this->apiUrl, '/').$path, $options + [
-                'auth_bearer' => trim($this->apiKey),
-                'headers' => ['Accept' => 'application/json'],
+                'auth_bearer' => $this->key(),
                 'timeout' => 8,
                 'max_duration' => 12,
             ]);
@@ -127,12 +232,20 @@ final class TickAfrica
             throw new TickAfricaUnavailable('Tick Africa injoignable.', 0, $e);
         }
 
-        if (200 === $status) {
+        if (200 === $status || 201 === $status) {
             return $data;
         }
 
         $error = \is_string($data['error'] ?? null) ? $data['error'] : 'HTTP_'.$status;
-        $context = ['status' => $status, 'error' => $error, 'message' => $data['message'] ?? null, 'path' => $path];
+        $fieldErrors = \is_array($data['errors'] ?? null) ? $data['errors'] : [];
+        $context = ['status' => $status, 'error' => $error, 'message' => $data['message'] ?? null, 'errors' => $fieldErrors, 'path' => $path];
+
+        // Commande : un refus métier (stock épuisé, téléphone invalide…) n'est pas une panne
+        if ('/orders' === $path && \in_array($status, [409, 422], true)) {
+            $this->logger->warning('Tick Africa a refusé la commande : {error} ({message})', $context);
+
+            throw new TickAfricaUnavailable(sprintf('Commande refusée par Tick Africa (%s).', $error), $status, null, $error, $fieldErrors);
+        }
 
         // 422 sur le seul champ code : le spectateur a saisi n'importe quoi, ce n'est pas une panne
         $codeOnly = 422 === $status && \is_array($data['errors'] ?? null) && [] === array_diff(array_keys($data['errors']), ['code']);
@@ -144,6 +257,6 @@ final class TickAfrica
         // 401 (clé), 403 (portée manquante), 404 (événement inconnu)… : problème de configuration
         $this->logger->log(\in_array($status, [401, 403, 404, 422], true) ? 'critical' : 'error', 'Tick Africa a répondu {status} {error} : {message}', $context);
 
-        throw new TickAfricaUnavailable(sprintf('Tick Africa a répondu %d (%s).', $status, $error), 422 === $status ? 0 : $status);
+        throw new TickAfricaUnavailable(sprintf('Tick Africa a répondu %d (%s).', $status, $error), 422 === $status ? 0 : $status, null, $error, $fieldErrors);
     }
 }

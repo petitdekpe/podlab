@@ -1,0 +1,143 @@
+{# Billetterie du premier écran : un cadran par séance, puis (une fois la séance choisie)
+   le nombre de places et les coordonnées. Les données partent chez Tick Africa
+   (POST /orders), qui renvoie un lien de paiement : formulaire envoyé hors Turbo. #}
+{% set e = commande.errors %}
+<form
+    method="post"
+    action="{{ path('app_billetterie_commande') }}#reservation"
+    class="order"
+    data-turbo="false"
+    data-booking-target="form"
+    data-action="change->booking#update input->booking#update submit->booking#submit"
+>
+    <input type="hidden" name="_token" value="{{ csrf_token(csrf_id) }}">
+    <input type="hidden" name="cle" value="{{ commande.idempotencyKey }}">
+
+    {% if e.form is defined %}
+        <p class="order__alert" role="alert">{{ e.form }}</p>
+    {% endif %}
+
+    <fieldset class="order__group">
+        <legend class="visually-hidden">Choisissez votre séance</legend>
+        <div class="dials">
+            {% for s in seances %}
+                {% set tarifs = s.tarifs|length > 0 ? s.tarifs : [null] %}
+                {% for t in tarifs %}
+                    {% set valeur = t ? s.key ~ '|' ~ t.id : '' %}
+                    {% set actif = s.onSale and t and t.available %}
+                    {% set complet = s.soldOut or (t and not t.available) %}
+                    <div class="dial{{ actif ? '' : ' is-disabled' }}{{ complet ? ' is-soldout' }}">
+                        <label class="dial__label">
+                            <input
+                                type="radio"
+                                name="billet"
+                                value="{{ valeur }}"
+                                class="dial__input"
+                                required
+                                {{ actif ? '' : 'disabled' }}
+                                {{ actif and commande.billet == valeur ? 'checked' }}
+                                {% if actif %}data-price="{{ t.price }}" data-max="{{ t.maxPerOrder }}"{% endif %}
+                            >
+                            <span class="dial__date">
+                                <span class="dial__weekday">{{ s.jourCourt|split(' ')|first }}</span>
+                                <span class="dial__day">{{ s.startsAt|date('d', 'Africa/Porto-Novo') }}</span>
+                                <span class="dial__month">nov.</span>
+                            </span>
+                            <span class="dial__venue"><span class="dial__brand">Majestic</span> {{ s.salle.name|replace({'Majestic ': ''}) }}</span>
+                            <span class="dial__meta">{{ s.heure }}{% if t and s.tarifs|length > 1 %} · {{ t.name }}{% endif %}</span>
+                            <span class="dial__foot">
+                                {% if actif %}
+                                    <span class="dial__price">{{ t.price|number_format(0, ',', ' ') }}&nbsp;F</span>
+                                    {% if t.remaining is not null and t.remaining <= 30 %}<span class="dial__left">Plus que {{ t.remaining }}</span>{% endif %}
+                                {% elseif complet %}
+                                    <span class="dial__stamp">Sold out</span>
+                                {% elseif s.status == 'passee' %}
+                                    <span class="dial__left">Terminée</span>
+                                {% else %}
+                                    <span class="dial__left">Bientôt</span>
+                                {% endif %}
+                            </span>
+                        </label>
+                        {% if complet and s.liveAccess %}
+                            <button type="button" class="dial__live" data-open-modal="live-tickets">Suivre le direct&nbsp;→</button>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+        {% if e.billet is defined %}<p class="order__error">{{ e.billet }}</p>{% endif %}
+    </fieldset>
+
+    {% if en_vente %}
+        {# Masqué par le JS tant qu'aucune séance n'est choisie (visible sans JS) #}
+        <div class="order__details" data-booking-target="details">
+            <fieldset class="order__group">
+                <legend class="order__legend">Places</legend>
+                <div class="qty">
+                    <button type="button" class="qty__btn" data-action="booking#minus" aria-label="Une place de moins">−</button>
+                    <input
+                        type="number"
+                        name="quantite"
+                        id="quantite"
+                        class="qty__input"
+                        value="{{ commande.quantity }}"
+                        min="1"
+                        max="{{ constant('App\\Billetterie\\Commande::MAX_QUANTITY') }}"
+                        inputmode="numeric"
+                        required
+                        aria-label="Nombre de places"
+                        data-booking-target="quantity"
+                    >
+                    <button type="button" class="qty__btn" data-action="booking#plus" aria-label="Une place de plus">+</button>
+                </div>
+                {% if e.quantite is defined %}<p class="order__error">{{ e.quantite }}</p>{% endif %}
+            </fieldset>
+
+            <fieldset class="order__group">
+                <legend class="order__legend">Vos coordonnées</legend>
+                <div class="order__row">
+                    <div class="field">
+                        <label for="prenom" class="field__label">Prénom</label>
+                        <input type="text" id="prenom" name="prenom" class="field__input" value="{{ commande.firstName }}" autocomplete="given-name" maxlength="80" required{{ e.prenom is defined ? ' aria-invalid="true"' }}>
+                        {% if e.prenom is defined %}<p class="order__error">{{ e.prenom }}</p>{% endif %}
+                    </div>
+                    <div class="field">
+                        <label for="nom" class="field__label">Nom</label>
+                        <input type="text" id="nom" name="nom" class="field__input" value="{{ commande.lastName }}" autocomplete="family-name" maxlength="80" required{{ e.nom is defined ? ' aria-invalid="true"' }}>
+                        {% if e.nom is defined %}<p class="order__error">{{ e.nom }}</p>{% endif %}
+                    </div>
+                </div>
+                <div class="order__row">
+                    <div class="field">
+                        <label for="email" class="field__label">E-mail</label>
+                        <input type="email" id="email" name="email" class="field__input" value="{{ commande.email }}" autocomplete="email" maxlength="180" required{{ e.email is defined ? ' aria-invalid="true"' }}>
+                        {% if e.email is defined %}<p class="order__error">{{ e.email }}</p>{% endif %}
+                    </div>
+                    <div class="field">
+                        <label for="telephone" class="field__label">Téléphone</label>
+                        <input type="tel" id="telephone" name="telephone" class="field__input" value="{{ commande.phone }}" autocomplete="tel" placeholder="01 66 61 78 78" maxlength="30" required{{ e.telephone is defined ? ' aria-invalid="true"' }}>
+                        {% if e.telephone is defined %}<p class="order__error">{{ e.telephone }}</p>{% endif %}
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="order__total">
+                <span>Total</span>
+                <span><strong data-booking-target="total">—</strong>&nbsp;FCFA</span>
+            </div>
+
+            <button type="submit" class="btn btn--dark btn--lg btn--block" data-booking-target="submit">
+                Payer
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+        </div>
+    {% else %}
+        <p class="order__soon">La billetterie des séances du 28 ouvre très bientôt.</p>
+    {% endif %}
+
+    <p class="order__secure">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        Mobile Money ou carte, via
+        <img src="{{ asset('images/logo-tickafrica.png') }}" alt="Tick Africa" class="tick-inline">
+    </p>
+</form>

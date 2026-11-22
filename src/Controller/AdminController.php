@@ -2,7 +2,9 @@
 
 namespace App\Controller;
 
+use App\Billetterie\Billetterie;
 use App\Live\AdminAuth;
+use App\Live\TickAfricaUnavailable;
 use App\Live\LiveSessions;
 use App\Live\LiveSettings;
 use App\Live\SuperCode;
@@ -33,6 +35,7 @@ final class AdminController extends AbstractController
         private readonly LiveCodeRepository $repository,
         private readonly LiveSessions $sessions,
         private readonly EntityManagerInterface $em,
+        private readonly Billetterie $billetterie,
     ) {
     }
 
@@ -127,7 +130,9 @@ final class AdminController extends AbstractController
             'soldout' => $this->settings->soldOut(),
             'live_ticket_url' => (string) $this->settings->get('live_ticket_url'),
             'tickafrica_event_id' => (string) $this->settings->get('tickafrica_event_id'),
+            'seances' => $this->seanceFields(),
         ];
+        $warnings = [];
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid(self::CSRF_ID, (string) $request->request->get('_token'))) {
@@ -143,7 +148,11 @@ final class AdminController extends AbstractController
                     'soldout' => $request->request->getBoolean('soldout'),
                     'live_ticket_url' => trim((string) $request->request->get('live_ticket_url')),
                     'tickafrica_event_id' => trim((string) $request->request->get('tickafrica_event_id')),
+                    'seances' => $this->seanceFields($request->request->all('seances')),
                 ];
+                // La clé n'est jamais réaffichée : champ vide = on garde celle enregistrée
+                $apiKey = trim((string) $request->request->get('tickafrica_api_key'));
+                $clearKey = $request->request->getBoolean('tickafrica_api_key_clear');
 
                 $opens = $this->parseLocal($form['opens_at'], $tz);
                 $ends = $this->parseLocal($form['ends_at'], $tz);
@@ -166,6 +175,27 @@ final class AdminController extends AbstractController
                     $errors[] = 'La fin du direct doit être après son ouverture.';
                 }
 
+                foreach ($form['seances'] as $key => $seance) {
+                    if ('' !== $seance['event'] && '' === LiveSettings::normalizeUuid($seance['event'])) {
+                        $errors[] = sprintf('Séance « %s » : l\'identifiant de l\'événement doit être un UUID.', $seance['label']);
+                    }
+                    if ('' !== $seance['tarifs'] && '' === $seance['event']) {
+                        $errors[] = sprintf('Séance « %s » : indiquez l\'événement avant de restreindre les billets.', $seance['label']);
+                    }
+                    foreach (array_filter(array_map('trim', explode(',', $seance['tarifs']))) as $tarif) {
+                        if ('' === LiveSettings::normalizeUuid($tarif)) {
+                            $errors[] = sprintf('Séance « %s » : « %s » n\'est pas un identifiant de billet (UUID).', $seance['label'], $tarif);
+                        }
+                    }
+                }
+
+                if ('' !== $apiKey && !$clearKey) {
+                    $keyError = $this->checkApiKey($apiKey, $warnings);
+                    if (null !== $keyError) {
+                        $errors[] = $keyError;
+                    }
+                }
+
                 if ([] === $errors && null !== $opens && null !== $ends) {
                     $this->settings->set('title', '' === $form['title'] ? null : $form['title']);
                     $this->settings->set('youtube', '' === $form['youtube'] ? null : LiveSettings::extractVideoId($form['youtube']));
@@ -176,7 +206,18 @@ final class AdminController extends AbstractController
                     $this->settings->set('soldout', $form['soldout'] ? '1' : '0');
                     $this->settings->set('live_ticket_url', '' === $form['live_ticket_url'] ? null : $form['live_ticket_url']);
                     $this->settings->set('tickafrica_event_id', LiveSettings::normalizeUuid($form['tickafrica_event_id']) ?: null);
+                    foreach ($form['seances'] as $key => $seance) {
+                        $this->settings->set('seance_'.$key, self::seanceLink($seance) ?: null);
+                    }
+                    if ($clearKey) {
+                        $this->settings->setTickafricaApiKey(null);
+                    } elseif ('' !== $apiKey) {
+                        $this->settings->setTickafricaApiKey($apiKey);
+                    }
                     $this->addFlash('admin_ok', 'Paramètres enregistrés.');
+                    foreach ($warnings as $warning) {
+                        $this->addFlash('admin_error', $warning);
+                    }
 
                     return $this->redirectToRoute('app_admin_settings');
                 }
@@ -191,7 +232,104 @@ final class AdminController extends AbstractController
             'tickafrica_event_default' => LiveSettings::normalizeUuid($this->settings->tickafricaEventIdDefault()),
             'tickafrica_key' => $this->tickAfrica->isConfigured(),
             'tickafrica_test' => $this->tickAfrica->isTestMode(),
+            'tickafrica_key_source' => $this->tickAfrica->keySource(),
+            'tickafrica_key_masked' => $this->tickAfrica->maskedKey(),
+            'tickafrica_key_unreadable' => $this->settings->tickafricaApiKeyUnreadable(),
+            'can_store_secrets' => $this->settings->canStoreSecrets(),
+            'tickafrica_events' => $this->tickafricaEvents(),
+            'seances_etat' => $this->billetterie->seances(),
         ]));
+    }
+
+    /**
+     * Champs « séances » du formulaire : saisie en cours, sinon valeurs enregistrées.
+     *
+     * @param array<string, mixed>|null $posted
+     *
+     * @return array<string, array{label: string, event: string, tarifs: string, default: string}>
+     */
+    private function seanceFields(?array $posted = null): array
+    {
+        $labels = ['marina-22' => 'Dim. 22 nov. · Majestic Marina', 'marina-28' => 'Sam. 28 nov. · Majestic Marina', 'wologuede-28' => 'Sam. 28 nov. · Majestic Wologuèdè'];
+        $defaults = $this->billetterie->defaultLinks();
+        $fields = [];
+
+        foreach (LiveSettings::SEANCES as $key) {
+            if (null !== $posted) {
+                $event = trim((string) ($posted[$key]['event'] ?? ''));
+                $tarifs = trim((string) ($posted[$key]['tarifs'] ?? ''));
+            } else {
+                [$event, $ids] = Billetterie::parseLink($this->settings->seanceLink($key));
+                $tarifs = implode(', ', $ids);
+            }
+            $fields[$key] = ['label' => $labels[$key], 'event' => $event, 'tarifs' => $tarifs, 'default' => $defaults[$key] ?? ''];
+        }
+
+        return $fields;
+    }
+
+    /** @param array{event: string, tarifs: string} $seance */
+    private static function seanceLink(array $seance): string
+    {
+        $event = LiveSettings::normalizeUuid($seance['event']);
+        if ('' === $event) {
+            return '';
+        }
+        $tarifs = array_filter(array_map(static fn (string $t): string => LiveSettings::normalizeUuid($t), explode(',', $seance['tarifs'])));
+
+        return [] === $tarifs ? $event : $event.':'.implode(',', $tarifs);
+    }
+
+    /**
+     * Vérifie une nouvelle clé auprès de Tick Africa avant de l'enregistrer.
+     *
+     * @param list<string> $warnings avertissements (la clé est tout de même enregistrée)
+     *
+     * @return string|null erreur bloquante
+     */
+    private function checkApiKey(#[\SensitiveParameter] string $apiKey, array &$warnings): ?string
+    {
+        if (!preg_match('/^ta_(live|test)_[A-Za-z0-9_\-]{8,}$/', $apiKey)) {
+            return 'La clé API Tick Africa doit commencer par ta_live_ (production) ou ta_test_ (test).';
+        }
+        if (!$this->settings->canStoreSecrets()) {
+            return 'Impossible d\'enregistrer la clé : APP_SECRET n\'est pas défini sur le serveur (fichier .env.local). Définissez-le, ou utilisez la variable TICKAFRICA_API_KEY.';
+        }
+
+        try {
+            $this->tickAfrica->withApiKey($apiKey)->events();
+        } catch (TickAfricaUnavailable $e) {
+            if (401 === $e->getCode()) {
+                return 'Tick Africa refuse cette clé (inconnue, révoquée ou expirée). Rien n\'a été enregistré.';
+            }
+            $warnings[] = 403 === $e->getCode()
+                ? 'Clé enregistrée, mais il lui manque la portée events:read : les séances ne pourront pas afficher leurs places. Dans le back-office Tick Africa, donnez-lui les portées events:read, orders:write, orders:read et tickets:validate.'
+                : 'Clé enregistrée sans avoir pu être vérifiée : Tick Africa ne répond pas pour le moment.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Événements Tick Africa de la clé, pour proposer leurs identifiants dans le formulaire.
+     *
+     * @return list<array{id: string, label: string}>
+     */
+    private function tickafricaEvents(): array
+    {
+        if (!$this->tickAfrica->isConfigured()) {
+            return [];
+        }
+        try {
+            $events = $this->tickAfrica->events();
+        } catch (TickAfricaUnavailable) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(static fn (array $e): array => [
+            'id' => (string) ($e['id'] ?? ''),
+            'label' => trim(sprintf('%s · %s', $e['name'] ?? '', substr((string) ($e['starts_at'] ?? ''), 0, 16))),
+        ], $events), static fn (array $e): bool => '' !== $e['id']));
     }
 
     /** Remplace le supercode (l'ancien cesse de fonctionner immédiatement). */
