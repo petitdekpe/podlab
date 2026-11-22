@@ -161,12 +161,13 @@ final class Billetterie
     }
 
     /** Garde la dernière commande échouée, pour l'afficher dans /admin (sans données personnelles). */
-    public function recordFailure(TickAfricaUnavailable $e, string $seance): void
+    public function recordFailure(TickAfricaUnavailable $e, string $seance, string $returnUrl = ''): void
     {
         $item = $this->cache->getItem('billetterie.last_failure');
         $this->cache->save($item->set([
             'at' => (new \DateTimeImmutable())->format('c'),
             'seance' => $seance,
+            'return_url' => $returnUrl,
             'status' => $e->getCode(),
             'error' => $e->apiError,
             'message' => $e->apiMessage ?: $e->getMessage(),
@@ -188,7 +189,8 @@ final class Billetterie
     public static function explain(string $error, int $status): string
     {
         return match (true) {
-            'MISSING_SCOPE' === $error => 'La clé n\'a pas le droit de créer des commandes : ajoutez-lui la portée orders:write dans le back-office Tick Africa (API & intégrations).',
+            'RETURN_URL_NOT_REGISTERED' === $error => 'L\'URL de retour envoyée (ci-dessus) n\'est pas enregistrée sur la clé. Dans le back-office Tick Africa, « API & intégrations », ajoutez-la sur la clé exactement à l\'identique (https, nom de domaine, chemin). Ou bien saisissez ici, dans « URL de retour après paiement », une URL déjà enregistrée sur la clé.',
+            'MISSING_SCOPE' === $error =>'La clé n\'a pas le droit de créer des commandes : ajoutez-lui la portée orders:write dans le back-office Tick Africa (API & intégrations).',
             'INVALID_API_KEY' === $error, 401 === $status => 'Tick Africa refuse la clé : régénérez-la et saisissez-la à nouveau.',
             'VALIDATION_ERROR' === $error => 'Tick Africa refuse des données de la commande (champs en cause ci-dessous). Si c\'est return_url : enregistrez l\'URL de retour sur la clé.',
             'IDEMPOTENCY_KEY_REUSED' === $error => 'Même tentative renvoyée avec des données différentes. Le site réessaie désormais tout seul : ce cas ne devrait plus bloquer l\'acheteur.',
@@ -210,7 +212,7 @@ final class Billetterie
             'PRODUCT_UNAVAILABLE', 'EVENT_NOT_ON_SALE', 'EVENT_REQUIRES_SEAT_SELECTION' => 'Cette séance n\'est plus en vente. Choisissez-en une autre.',
             'VALIDATION_ERROR' => 'Vérifiez vos coordonnées : Tick Africa ne les a pas acceptées.',
             'RATE_LIMITED', 'REQUEST_IN_PROGRESS' => 'Beaucoup de monde réserve en ce moment. Réessayez dans quelques secondes.',
-            'MISSING_SCOPE', 'INVALID_API_KEY', 'NO_PAYMENT_URL' => 'La vente en ligne est momentanément indisponible. Réessayez un peu plus tard ou écrivez-nous sur WhatsApp au 0166617878 : vous n\'avez pas été débité.',
+            'MISSING_SCOPE', 'INVALID_API_KEY', 'NO_PAYMENT_URL', 'RETURN_URL_NOT_REGISTERED' => 'La vente en ligne est momentanément indisponible. Réessayez un peu plus tard ou écrivez-nous sur WhatsApp au 0166617878 : vous n\'avez pas été débité.',
             default => 'La billetterie ne répond pas pour le moment. Réessayez dans un instant : vous n\'avez pas été débité.',
         };
     }

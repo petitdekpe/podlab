@@ -58,6 +58,26 @@ final class LiveSettings
         return null !== $this->secrets && $this->secrets->isUsable();
     }
 
+    /** URL de retour après paiement saisie dans /admin, ou ''. */
+    public function returnUrl(): string
+    {
+        return trim((string) $this->get('return_url'));
+    }
+
+    /**
+     * URL de retour par défaut : celle du site, toujours en https (derrière un proxy
+     * qui termine le TLS, Symfony la génère sinon en http://, que Tick Africa refuserait).
+     */
+    public static function defaultReturnUrl(string $generated): string
+    {
+        $host = (string) parse_url($generated, \PHP_URL_HOST);
+        if (\in_array($host, ['localhost', '127.0.0.1'], true)) {
+            return $generated;
+        }
+
+        return preg_replace('#^http://#i', 'https://', $generated) ?? $generated;
+    }
+
     /**
      * Événement Tick Africa d'une séance saisi dans /admin : « uuid » ou
      * « uuid:uuid-tarif,uuid-tarif ». '' s'il n'est pas défini.

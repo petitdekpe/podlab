@@ -131,6 +131,7 @@ final class AdminController extends AbstractController
             'live_ticket_url' => (string) $this->settings->get('live_ticket_url'),
             'tickafrica_event_id' => (string) $this->settings->get('tickafrica_event_id'),
             'seances' => $this->seanceFields(),
+            'return_url' => $this->settings->returnUrl(),
         ];
         $warnings = [];
 
@@ -149,6 +150,7 @@ final class AdminController extends AbstractController
                     'live_ticket_url' => trim((string) $request->request->get('live_ticket_url')),
                     'tickafrica_event_id' => trim((string) $request->request->get('tickafrica_event_id')),
                     'seances' => $this->seanceFields($request->request->all('seances')),
+                    'return_url' => trim((string) $request->request->get('return_url')),
                 ];
                 // La clé n'est jamais réaffichée : champ vide = on garde celle enregistrée
                 $apiKey = trim((string) $request->request->get('tickafrica_api_key'));
@@ -189,6 +191,10 @@ final class AdminController extends AbstractController
                     }
                 }
 
+                if ('' !== $form['return_url'] && (!str_starts_with($form['return_url'], 'https://') || false === filter_var($form['return_url'], \FILTER_VALIDATE_URL))) {
+                    $errors[] = 'L\'URL de retour après paiement doit être une adresse complète commençant par https://.';
+                }
+
                 if ('' !== $apiKey && !$clearKey) {
                     $keyError = $this->checkApiKey($apiKey, $warnings);
                     if (null !== $keyError) {
@@ -209,6 +215,7 @@ final class AdminController extends AbstractController
                     foreach ($form['seances'] as $key => $seance) {
                         $this->settings->set('seance_'.$key, self::seanceLink($seance) ?: null);
                     }
+                    $this->settings->set('return_url', $form['return_url'] ?: null);
                     if ($clearKey) {
                         $this->settings->setTickafricaApiKey(null);
                     } elseif ('' !== $apiKey) {
@@ -239,6 +246,7 @@ final class AdminController extends AbstractController
             'tickafrica_events' => $this->tickafricaEvents(),
             'seances_etat' => $this->billetterie->seances(),
             'derniere_erreur' => $this->lastOrderFailure(),
+            'return_url_default' => LiveSettings::defaultReturnUrl($this->generateUrl('app_billetterie_merci', [], \Symfony\Component\Routing\Generator\UrlGeneratorInterface::ABSOLUTE_URL)),
             'diagnostic' => $request->getSession()->get('tickafrica_diagnostic'),
         ]));
     }

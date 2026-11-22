@@ -179,6 +179,14 @@ final class BilletterieTest extends TestCase
         self::assertStringContainsString('orders:write', Billetterie::explain($failure['error'], $failure['status']));
     }
 
+    public function testReturnUrlIsAlwaysHttpsExceptLocally(): void
+    {
+        self::assertSame('https://podlab.beninbouge.com/billetterie/merci', LiveSettings::defaultReturnUrl('http://podlab.beninbouge.com/billetterie/merci'));
+        self::assertSame('https://podlab.beninbouge.com/billetterie/merci', LiveSettings::defaultReturnUrl('https://podlab.beninbouge.com/billetterie/merci'));
+        self::assertSame('http://localhost/billetterie/merci', LiveSettings::defaultReturnUrl('http://localhost/billetterie/merci'));
+        self::assertStringContainsString('à l\'identique', Billetterie::explain('RETURN_URL_NOT_REGISTERED', 422));
+    }
+
     public function testDiagnoseReportsEachScopeWithoutSelling(): void
     {
         $calls = [];

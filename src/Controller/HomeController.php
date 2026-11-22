@@ -55,7 +55,7 @@ final class HomeController extends AbstractController
             return $this->page($commande, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $retour = $this->generateUrl('app_billetterie_merci', [], UrlGeneratorInterface::ABSOLUTE_URL);
+        $retour = $this->returnUrl();
         try {
             try {
                 $paiement = $this->billetterie->commander($commande, $retour);
@@ -69,7 +69,7 @@ final class HomeController extends AbstractController
                 $paiement = $this->billetterie->commander($commande, $retour);
             }
         } catch (TickAfricaUnavailable $e) {
-            $this->billetterie->recordFailure($e, $commande->seanceKey());
+            $this->billetterie->recordFailure($e, $commande->seanceKey(), $retour);
             $commande->errors = Billetterie::fieldErrors($e);
             $commande->errors['form'] = Billetterie::message($e);
             // Refus métier : la prochaine tentative est une nouvelle commande.
@@ -118,6 +118,21 @@ final class HomeController extends AbstractController
         $response->headers->addCacheControlDirective('no-store');
 
         return $response;
+    }
+
+    /**
+     * Où Tick Africa renvoie l'acheteur après paiement. Doit être IDENTIQUE à une URL
+     * enregistrée sur la clé : celle saisie dans /admin, sinon /billetterie/merci en https.
+     */
+    private function returnUrl(): string
+    {
+        try {
+            $url = $this->settings->returnUrl();
+        } catch (\Throwable) {
+            $url = '';
+        }
+
+        return '' !== $url ? $url : LiveSettings::defaultReturnUrl($this->generateUrl('app_billetterie_merci', [], UrlGeneratorInterface::ABSOLUTE_URL));
     }
 
     private function page(Commande $commande, int $status = Response::HTTP_OK): Response

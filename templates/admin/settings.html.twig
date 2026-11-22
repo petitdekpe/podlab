@@ -67,7 +67,6 @@
         <input id="tickafrica_api_key" name="tickafrica_api_key" type="password" class="adm-input" value="" placeholder="ta_live_…" autocomplete="new-password" spellcheck="false"{{ can_store_secrets ? '' : ' disabled' }}>
         <p class="adm-help">
             Back-office Tick Africa, onglet « API &amp; intégrations ». Portées nécessaires&nbsp;: <code>events:read</code>, <code>orders:write</code>, <code>orders:read</code> et <code>tickets:validate</code>.
-            Ajoutez aussi sur la clé l'URL de retour <code>{{ url('app_billetterie_merci') }}</code>.
             La clé est vérifiée auprès de Tick Africa, puis enregistrée chiffrée&nbsp;; elle n'est plus jamais affichée. Laissez le champ vide pour garder la clé actuelle.
             {% if not can_store_secrets %}<br><strong>Indisponible&nbsp;:</strong> APP_SECRET n'est pas défini sur le serveur (fichier .env.local).{% endif %}
         </p>
@@ -77,6 +76,13 @@
                 <span><strong>Supprimer la clé enregistrée ici</strong><br><span class="adm-muted">Le site reprend alors la clé du serveur (TICKAFRICA_API_KEY), s'il y en a une.</span></span>
             </label>
         {% endif %}
+
+        <label class="adm-label" for="return_url">URL de retour après paiement</label>
+        <input id="return_url" name="return_url" type="url" class="adm-input" value="{{ form.return_url }}" placeholder="{{ return_url_default }}" autocomplete="off" spellcheck="false">
+        <p class="adm-help">
+            Page où Tick Africa renvoie l'acheteur après paiement. <strong>Elle doit être enregistrée sur la clé, à l'identique</strong>, dans le back-office Tick Africa («&nbsp;API &amp; intégrations&nbsp;»), sinon toute commande est refusée.
+            Laissé vide, le site envoie <code>{{ form.return_url ?: return_url_default }}</code>&nbsp;: c'est cette adresse qu'il faut copier sur la clé.
+        </p>
 
         <h2 class="adm-h2 adm-h2--section">Billets du direct</h2>
 
@@ -161,6 +167,7 @@
                 Réponse&nbsp;: <code>{{ derniere_erreur.status ?: 'pas de réponse' }} {{ derniere_erreur.error }}</code>
                 {% if derniere_erreur.message %}· «&nbsp;{{ derniere_erreur.message }}&nbsp;»{% endif %}
                 {% if derniere_erreur.fields %}<br>Champs en cause&nbsp;: <code>{{ derniere_erreur.fields|join(', ') }}</code>{% endif %}
+                {% if derniere_erreur.return_url ?? false %}<br>URL de retour envoyée&nbsp;: <code>{{ derniere_erreur.return_url }}</code>{% endif %}
                 <br><strong>Que faire&nbsp;:</strong> {{ derniere_erreur.explication }}
             </div>
         {% else %}
