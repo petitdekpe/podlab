@@ -51,6 +51,8 @@ final class HomePageTest extends WebTestCase
         self::assertStringContainsString('Majestic Wologuèdè', $crawler->filter('form.order')->text());
         // Un cadran par séance ; celui du 22 est « Sold out » et mène au direct
         self::assertCount(3, $crawler->filter('form.order .dial'));
+        // Places restantes affichées sur chaque séance en vente (50 dans la réponse simulée)
+        self::assertSame(['50 places restantes', '50 places restantes'], $crawler->filter('.dial__seats')->each(fn ($n) => trim($n->text())));
         self::assertSame('Sold out', $crawler->filter('.dial.is-soldout .dial__stamp')->text());
         self::assertSame('22', $crawler->filter('.dial.is-soldout .dial__day')->text());
         // Bouton du direct : seulement tant que le direct n'est pas terminé (22/11, 16h00)

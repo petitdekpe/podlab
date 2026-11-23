@@ -1,8 +1,8 @@
 {# État d'une séance, en une pastille. Variable : s (App\Billetterie\Seance) #}
 {% set restantes = s.placesRestantes %}
 {% if s.onSale %}
-    {% if restantes is not null and restantes <= 30 %}
-        <p class="status status--hot">Plus que {{ restantes }} place{{ restantes > 1 ? 's' }}</p>
+    {% if restantes is not null %}
+        <p class="status {{ restantes <= 20 ? 'status--hot' : 'status--open' }}">{{ restantes }} place{{ restantes > 1 ? 's' }} restante{{ restantes > 1 ? 's' }}</p>
     {% else %}
         <p class="status status--open">Places disponibles</p>
     {% endif %}

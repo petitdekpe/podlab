@@ -48,7 +48,10 @@
                             <span class="dial__foot">
                                 {% if actif %}
                                     <span class="dial__price">{{ t.price|number_format(0, ',', ' ') }}&nbsp;F</span>
-                                    {% if t.remaining is not null and t.remaining <= 30 %}<span class="dial__left">Plus que {{ t.remaining }}</span>{% endif %}
+                                    {# Places restantes, toujours affichées ; mises en avant quand il en reste peu #}
+                                    {% if t.remaining is not null %}
+                                        <span class="dial__seats{{ t.remaining <= 20 ? ' is-low' }}">{{ t.remaining }} place{{ t.remaining > 1 ? 's' }} restante{{ t.remaining > 1 ? 's' }}</span>
+                                    {% endif %}
                                 {% elseif complet %}
                                     <span class="dial__stamp">Sold out</span>
                                 {% elseif s.status == 'passee' %}
