@@ -68,6 +68,8 @@ final class VentesTest extends WebTestCase
         self::assertStringContainsString('140 places restantes', $crawler->filter('.vt-hero__main')->text());
         // Recette : 7 × 10 000 + 3 × 8 000
         self::assertStringContainsString('94 000 F', $crawler->filter('.vt-kpis')->text());
+        // Tickets vendus par séance, juste sous le total
+        self::assertSame(['7', '3'], $crawler->filter('.vt-hero .vt-par__big')->each(fn ($n) => trim($n->text())));
         self::assertSame(['7 %', '6 %'], $crawler->filter('.vt-seance__big')->each(fn ($n) => trim(explode(' rempli', $n->text())[0])));
         // Une commande en attente, une annulée : 3 payées sur 4 tentatives
         self::assertStringContainsString('75 %', $crawler->filter('.vt-kpis')->text());

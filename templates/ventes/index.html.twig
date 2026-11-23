@@ -17,14 +17,14 @@
     {% set g = r.global %}
     {% set seances = r.seances %}
 
+    <div class="vt-page">
     <header class="adm-top">
         <div class="adm-top__in">
             <span class="adm-brand">
                 <img src="{{ asset('images/logo-podlab.jpg') }}" alt="" class="adm-brand__logo">
                 <span>Bilan des ventes</span>
             </span>
-            <p class="vt-maj adm-muted">Mis à jour à {{ r.at|date('H\\hi', 'Africa/Porto-Novo') }} · actualisation auto toutes les 2 min</p>
-            <a class="adm-btn adm-btn--small" href="{{ path('app_ventes', {actualiser: 1}) }}">Actualiser</a>
+            <a class="adm-btn adm-btn--small vt-top__refresh" href="{{ path('app_ventes', {actualiser: 1}) }}">Actualiser</a>
             <form method="post" action="{{ path('app_ventes_logout') }}">
                 <input type="hidden" name="_token" value="{{ csrf_token('ventes') }}">
                 <button type="submit" class="adm-btn adm-btn--ghost adm-btn--small">Fermer</button>
@@ -33,13 +33,50 @@
     </header>
 
     <main class="adm-main vt">
-        <div>
+        <div class="vt-title">
             <h1 class="adm-h1">Dimanche 29 novembre · 13h00</h1>
             <p class="adm-muted">
-                Majestic Marina et Majestic Wologuèdè ·
-                {% if g.jours_restants > 1 %}J-{{ g.jours_restants|round(0, 'ceil') }} avant les séances{% elseif g.jours_restants > 0 %}séances dans moins de 24 h{% else %}séances passées{% endif %}
+                {% if g.jours_restants > 1 %}J-{{ g.jours_restants|round(0, 'ceil') }}{% elseif g.jours_restants > 0 %}Dans moins de 24 h{% else %}Séances passées{% endif %}
+                · mis à jour à {{ r.at|date('H\\hi', 'Africa/Porto-Novo') }}
             </p>
         </div>
+
+        {# --- Tickets vendus : ce qu'on voit en premier --------------------- #}
+        <section class="vt-hero adm-card" aria-labelledby="vt-total">
+            <div class="vt-hero__main">
+                <p class="adm-card__label" id="vt-total">Tickets vendus · total</p>
+                <p class="vt-hero__big">
+                    {{ f.n(g.vendues) }}<span class="vt-hero__of"> / {{ f.n(g.total) }}</span>
+                </p>
+                <p class="vt-hero__sub">{{ f.pct(g.taux) }} de remplissage · {{ f.n(g.restantes) }} places restantes</p>
+
+                {% if g.total %}
+                    <div class="vt-fill vt-fill--big" role="img" aria-label="Remplissage global : {{ f.pct(g.taux) }}">
+                        {% for key, s in seances %}
+                            {% if s.vendues %}
+                                <span class="vt-fill__seg vt-s{{ couleurs[key] }}" style="width: {{ (s.vendues / g.total * 100)|round(2) }}%" title="{{ s.salle }} : {{ f.n(s.vendues) }} vendus"></span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <ul class="vt-par" aria-label="Tickets vendus par séance">
+                {% for key, s in seances %}
+                    <li class="vt-par__item">
+                        <p class="vt-par__name"><span class="vt-dot vt-s{{ couleurs[key] }}" aria-hidden="true"></span>{{ s.salle|replace({'Majestic ': ''}) }}</p>
+                        <p class="vt-par__big">{{ f.n(s.vendues) }}</p>
+                        <p class="vt-par__sub">sur {{ s.illimite ? '∞' : f.n(s.total) }} · {{ f.pct(s.taux) }}</p>
+                        <div class="vt-fill" aria-hidden="true">
+                            {% if s.total and s.vendues %}
+                                <span class="vt-fill__seg vt-s{{ couleurs[key] }}" style="width: {{ (s.vendues / s.total * 100)|round(2) }}%"></span>
+                            {% endif %}
+                        </div>
+                        {% if r.commandes_ok %}<p class="vt-par__sub">+{{ f.n(s.h24) }} en 24 h</p>{% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
 
         {% if not r.configure %}
             <p class="adm-alert adm-alert--error" role="alert">Aucune clé API Tick Africa : renseignez-la dans /admin › Paramètres.</p>
@@ -54,32 +91,8 @@
             <p class="adm-alert adm-alert--error" role="alert">{{ r.commandes_erreur ?? 'Commandes indisponibles.' }} Les places vendues viennent alors des stocks Tick Africa uniquement.</p>
         {% endif %}
 
-        {# --- Chiffres clés ------------------------------------------------- #}
-        <section class="vt-hero adm-card" aria-labelledby="vt-total">
-            <div class="vt-hero__main">
-                <p class="adm-card__label" id="vt-total">Places vendues · deux séances</p>
-                <p class="vt-hero__big">
-                    {{ f.n(g.vendues) }}<span class="vt-hero__of"> / {{ f.n(g.total) }}</span>
-                </p>
-                <p class="adm-muted">{{ f.pct(g.taux) }} de remplissage · {{ f.n(g.restantes) }} places restantes</p>
-
-                {% if g.total %}
-                    <div class="vt-fill vt-fill--big" role="img" aria-label="Remplissage global : {{ f.pct(g.taux) }}">
-                        {% for key, s in seances %}
-                            {% if s.vendues %}
-                                <span class="vt-fill__seg vt-s{{ couleurs[key] }}" style="width: {{ (s.vendues / g.total * 100)|round(2) }}%" title="{{ s.salle }} : {{ f.n(s.vendues) }} vendues"></span>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                    <ul class="vt-legend">
-                        {% for key, s in seances %}
-                            <li><span class="vt-dot vt-s{{ couleurs[key] }}"></span>{{ s.salle }} <strong>{{ f.n(s.vendues) }}</strong></li>
-                        {% endfor %}
-                        <li><span class="vt-dot vt-dot--empty"></span>Restantes <strong>{{ f.n(g.restantes) }}</strong></li>
-                    </ul>
-                {% endif %}
-            </div>
-
+        {# --- Performance --------------------------------------------------- #}
+        <section class="adm-card" aria-label="Performance">
             <dl class="vt-kpis">
                 <div>
                     <dt>Recette</dt>
@@ -246,4 +259,5 @@
             </ul>
         </details>
     </main>
+    </div>
 {% endblock %}

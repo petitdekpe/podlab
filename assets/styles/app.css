@@ -2557,7 +2557,8 @@ html.is-modal-open { overflow: hidden; }
 .vt-s1 { background: var(--series-1); }
 .vt-s2 { background: var(--series-2); }
 
-.vt-maj { margin-right: auto; font-size: 14px; }
+.vt-top__refresh { margin-left: auto; }
+.vt-title .adm-muted { margin-top: 4px; }
 .vt-code { font-size: 22px; letter-spacing: 0.3em; text-align: center; }
 
 .vt-dot { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; }
@@ -2573,9 +2574,18 @@ html.is-modal-open { overflow: hidden; }
 .vt-fill__seg { display: block; height: 100%; min-width: 3px; }
 .vt-fill__seg:last-child { border-radius: 0 4px 4px 0; }
 
-.vt-hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr); gap: 32px; }
-.vt-hero__big { margin: 6px 0 4px; font-family: var(--font-display); font-size: clamp(2.75rem, 7vw, 4.5rem); font-weight: 800; line-height: 1; letter-spacing: -0.03em; }
-.vt-hero__of { font-size: 0.45em; color: var(--color-text-subtle); letter-spacing: 0; }
+/* bloc d'ouverture : tickets vendus au total, puis par séance */
+.vt-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: center; }
+.vt-hero__big { margin: 6px 0 4px; font-family: var(--font-display); font-size: clamp(4rem, 9vw, 6rem); font-weight: 800; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.vt-hero__of { font-size: 0.36em; color: var(--color-text-subtle); letter-spacing: 0; }
+.vt-hero__sub { color: var(--color-text-muted); }
+
+.vt-par { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.vt-par__item { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 18px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--color-surface-2); }
+.vt-par__item .vt-fill { margin: 8px 0 4px; height: 8px; }
+.vt-par__name { display: flex; align-items: center; gap: 8px; font-weight: 700; overflow-wrap: anywhere; }
+.vt-par__big { font-family: var(--font-display); font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.vt-par__sub { font-size: 14px; color: var(--color-text-subtle); }
 
 .vt-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; margin: 0; }
 .vt-kpis > div { padding-left: 14px; border-left: 1px solid var(--color-border); }
@@ -2654,13 +2664,40 @@ html.is-modal-open { overflow: hidden; }
 .vt-notes { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-left: 18px; }
 
 @media (max-width: 900px) {
-    .vt-hero { grid-template-columns: 1fr; gap: 24px; }
+    .vt-hero { grid-template-columns: 1fr; gap: 20px; }
 }
+
+/* téléphone : en-tête sur une ligne, tickets vendus visibles sans défiler */
 @media (max-width: 560px) {
-    .vt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .vt-kpis dd { font-size: 22px; }
-    .vt-maj { order: 3; width: 100%; }
-    .vt-chart__plot { gap: 3px; }
+    .vt-page { --gutter: 14px; }
+    .vt-page .adm-top__in { flex-wrap: nowrap; gap: 8px; padding-top: 10px; padding-bottom: 10px; }
+    .vt-page .adm-brand { gap: 8px; font-size: 15px; white-space: nowrap; }
+    .vt-page .adm-brand__logo { width: 30px; height: 30px; }
+    .vt-page .adm-btn--small { min-height: 34px; padding: 0 12px; font-size: 13px; }
+    .vt-page .adm-main { padding-top: 16px; gap: 14px; }
+    .vt-page .adm-card { padding: 16px; border-radius: 14px; }
+
+    .vt-title .adm-h1 { font-size: 20px; }
+    .vt-title .adm-muted { font-size: 14px; }
+
+    .vt-hero { gap: 16px; }
+    .vt-hero__big { font-size: 64px; }
+    .vt-hero__sub { font-size: 15px; }
+    .vt-par { gap: 10px; }
+    .vt-par__item { padding: 14px; }
+    .vt-par__big { font-size: 44px; }
+    .vt-par__sub { font-size: 13px; }
+
+    .vt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+    .vt-kpis > div { padding-left: 10px; }
+    .vt-kpis dt { font-size: 11px; }
+    .vt-kpis dd { font-size: 21px; }
+
+    .vt-seance__big { font-size: 32px; }
+    .vt-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .vt-chart__plot { gap: 3px; height: 180px; }
+    .vt-chart__max { width: 18px; }
     .vt-col:nth-child(even) .vt-col__label { visibility: hidden; }
 }
 @media (forced-colors: active) {
