@@ -103,6 +103,25 @@ final class Billetterie
         return ['marina-22' => $this->marina22, 'marina-28' => $this->marina28, 'wologuede-28' => $this->wologuede28];
     }
 
+    /**
+     * Lien effectif de chaque séance : celui de /admin, sinon celui de l'environnement.
+     *
+     * @return array<string, string>
+     */
+    public function links(): array
+    {
+        $liens = $this->defaultLinks();
+        try {
+            foreach ($liens as $key => $defaut) {
+                $liens[$key] = $this->settings->seanceLink($key) ?: $defaut;
+            }
+        } catch (\Throwable) {
+            // base indisponible : liens de l'environnement
+        }
+
+        return $liens;
+    }
+
     /** Oublie les séances déjà calculées (après un changement de réglage dans /admin). */
     public function refresh(): void
     {

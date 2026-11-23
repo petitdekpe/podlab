@@ -50,3 +50,8 @@ services:
             $marina22: '%env(string:TICKAFRICA_SEANCE_MARINA_22)%'
             $marina28: '%env(string:TICKAFRICA_SEANCE_MARINA_28)%'
             $wologuede28: '%env(string:TICKAFRICA_SEANCE_WOLOGUEDE_28)%'
+
+    # Page /ventes : bilan des ventes, ouverte avec un code d'accès
+    App\Controller\VentesController:
+        arguments:
+            $code: '%env(string:VENTES_CODE)%'

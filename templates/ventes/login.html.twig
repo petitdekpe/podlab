@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Ventes · Podlab × Bénin Bouge{% endblock %}
+
+{% block meta %}
+    <meta name="robots" content="noindex, nofollow">
+{% endblock %}
+
+{% block body %}
+    <main class="adm-login">
+        <section class="adm-card adm-login__card" aria-labelledby="vt-login-title">
+            <img src="{{ asset('images/logo-podlab.jpg') }}" alt="Podlab" class="adm-login__logo">
+            <h1 id="vt-login-title" class="adm-h1">Bilan des ventes</h1>
+            <p class="adm-muted">Séances du dimanche 29 novembre. Saisissez le code d'accès.</p>
+
+            {% if not configured %}
+                <p class="adm-alert adm-alert--error" role="alert">Aucun code d'accès n'est défini (variable VENTES_CODE).</p>
+            {% endif %}
+            {% if error %}
+                <p class="adm-alert adm-alert--error" role="alert">{{ error }}</p>
+            {% endif %}
+
+            <form method="post" class="adm-form" action="{{ path('app_ventes') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('ventes') }}">
+                <label class="adm-label" for="code">Code d'accès</label>
+                <input id="code" name="code" type="password" inputmode="numeric" class="adm-input vt-code" autocomplete="off" spellcheck="false" required autofocus>
+                <button type="submit" class="adm-btn adm-btn--primary adm-btn--block">Voir les ventes</button>
+            </form>
+        </section>
+    </main>
+{% endblock %}

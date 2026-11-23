@@ -181,6 +181,21 @@ final class TickAfrica
         return \is_array($data['data'] ?? null) ? $data['data'] : [];
     }
 
+    /**
+     * Une page de la liste des commandes (portée orders:read), réponse complète
+     * (data + meta/links de pagination).
+     *
+     * @param array<string, scalar> $query
+     *
+     * @return array<string, mixed>
+     *
+     * @throws TickAfricaUnavailable
+     */
+    public function orders(array $query = []): array
+    {
+        return $this->request('GET', '/orders', ['query' => $query, 'timeout' => 8, 'max_duration' => 12]);
+    }
+
     private function ticket(string $path, string $code, string $eventId): TicketVerdict
     {
         $body = ['code' => $code];
