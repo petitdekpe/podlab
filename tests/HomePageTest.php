@@ -42,7 +42,7 @@ final class HomePageTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         // Premier écran : l'affiche puis la billetterie, dans la même section
-        self::assertCount(1, $crawler->filter('#reservation .top__poster .poster img'));
+        self::assertCount(1, $crawler->filter('#reservation .top__poster .poster__img'));
         self::assertCount(1, $crawler->filter('#reservation .top__ticketing form.order'));
         self::assertSelectorTextContains('h1', 'Moi, à quatre pattes');
         // Trois séances : le 22 complet (avec le direct), les deux du 29 en vente
@@ -55,11 +55,9 @@ final class HomePageTest extends WebTestCase
         self::assertSame(['50 places restantes', '50 places restantes'], $crawler->filter('.dial__seats')->each(fn ($n) => trim($n->text())));
         self::assertSame('Sold out', $crawler->filter('.dial.is-soldout .dial__stamp')->text());
         self::assertSame('22', $crawler->filter('.dial.is-soldout .dial__day')->text());
-        // Bouton du direct : seulement tant que le direct n'est pas terminé (22/11, 16h00)
-        $directAVenir = new \DateTimeImmutable() < new \DateTimeImmutable('2026-11-22T16:00:00+01:00');
-        self::assertCount($directAVenir ? 1 : 0, $crawler->filter('.dial.is-soldout .dial__live[data-open-modal="live-tickets"]'));
+        // Base absente : aucun direct proposé
         self::assertCount(3, $crawler->filter('.seance-strip__item'));
-        self::assertCount($directAVenir ? 1 : 0, $crawler->filter('dialog[data-modal-id-value="live-tickets"]'));
+        self::assertSelectorNotExists('[data-open-modal], dialog');
     }
 
     public function testValidFormRedirectsToTickAfricaPayment(): void

@@ -3,8 +3,9 @@
 {% block title %}Edgar-Yves : Moi, à quatre pattes ?! · Billetterie Podlab au cinéma{% endblock %}
 
 {% block meta %}
-    {% set apercu_titre = 'Podlab au cinéma : nouvelles séances le 29 novembre' %}
-    {% set apercu_description = "Edgar-Yves : Moi, à quatre pattes ?! Ceci n'est pas un podcast, ceci n'est pas un stand-up, c'est un sit-down. Séance du 22 novembre complète. Nouvelles séances le dimanche 29 novembre 2026 à 13h00 au Majestic Marina et au Majestic Wologuèdè, Cotonou." %}
+    {% set apercu_titre = 'Podlab au cinéma' ~ (dates_a_venir ? ' : ' ~ (a_venir|length > 1 ? 'séances le ' : 'séance le ') ~ dates_a_venir) %}
+    {% set apercu_seances = a_venir|map(s => s.jour ~ ' à ' ~ s.heure ~ ' au ' ~ s.salle.name)|join(', ') %}
+    {% set apercu_description = "Edgar-Yves : Moi, à quatre pattes ?! Ceci n'est pas un podcast, ceci n'est pas un stand-up, c'est un sit-down." ~ (apercu_seances ? ' ' ~ apercu_seances ~ ', Cotonou.') %}
     <meta name="description" content="{{ apercu_description }}">
 
     {# Aperçu du lien (WhatsApp, Facebook, LinkedIn, X…) #}
@@ -29,11 +30,14 @@
 {% set prix = (prix_min ?? 10000)|number_format(0, ',', ' ') %}
 {% set debut_iso = prochaine ? prochaine.startsAt|date('c') : 'now'|date('c') %}
 
-{% set programme = [
-    { heure: '12h30', titre: 'Accueil et installation' },
-    { heure: '12h55', titre: 'Fermeture des portes', desc: 'Aucune entrée après, même avec un billet.' },
-    { heure: '13h00 – 15h00', titre: 'Moi, à quatre pattes ?!', desc: "L'Édition Spéciale Podlab × Bénin Bouge sur grand écran.", highlight: true },
-] %}
+{# Déroulé de la séance à l'affiche #}
+{% set programme = [] %}
+{% if vedette %}
+    {% set ev = vedette.evenement %}
+    {% if ev.portes %}{% set programme = programme|merge([{ heure: ev.portes, titre: 'Accueil et installation' }]) %}{% endif %}
+    {% if ev.fermeture %}{% set programme = programme|merge([{ heure: ev.fermeture, titre: 'Fermeture des portes', desc: 'Aucune entrée après, même avec un billet.' }]) %}{% endif %}
+    {% set programme = programme|merge([{ heure: ev.horaire, titre: ev.titre, desc: "L'Édition Spéciale Podlab × Bénin Bouge sur grand écran.", highlight: true }]) %}
+{% endif %}
 
 {% set pour_qui = [
     'Vous voulez passer un après-midi inoubliable, entre amis, en famille ou en couple.',
@@ -56,7 +60,7 @@
     {% if direct_en_cours %}
         <a href="{{ path('app_live') }}" class="live-banner" data-turbo="false">
             <span class="live-banner__dot" aria-hidden="true"></span>
-            <span>Le direct du 22 novembre est en cours. <strong>Rejoindre le direct</strong></span>
+            <span>Le direct du {{ direct_en_cours.date }} est en cours. <strong>Rejoindre le direct</strong></span>
             {{ icone_fleche }}
         </a>
     {% endif %}
@@ -79,17 +83,23 @@
 
     <main data-controller="booking">
         {# ---------- Premier écran : l'affiche à gauche, la billetterie à droite ---------- #}
-        <section id="reservation" class="container top">
-            <div class="top__poster">
+        <section id="reservation" class="container top" data-controller="poster-fit"{% if affiche %} style="--poster-ratio: {{ (affiche.width / affiche.height)|round(4) }}"{% endif %}>
+            <div class="top__poster" data-poster-fit-target="poster">
                 <div class="poster">
-                    <img src="{{ asset('images/affiche-moi-a-quatre-pattes.jpg') }}" alt="Affiche : Podlab en collaboration avec Bénin Bouge présentent « Moi, à quatre pattes ? » avec Edgar-Yves Jr, au Majestic Cinéma. Réservation sur podlab.beninbouge.com" class="media-cover" width="1200" height="1500" fetchpriority="high">
+                    {% if affiche %}
+                        <img src="{{ path('app_affiche', { v: affiche.version }) }}" alt="Affiche : « Moi, à quatre pattes ?! » avec Edgar-Yves, par Podlab et Bénin Bouge" class="media-cover poster__img" width="{{ affiche.width }}" height="{{ affiche.height }}" fetchpriority="high">
+                    {% else %}
+                        <img src="{{ asset(constant('App\\Site\\Affiche::ORIGINE')) }}" alt="Affiche : Podlab et Bénin Bouge présentent « Moi, à quatre pattes ? » avec Edgar-Yves Jr. Dimanche 22 novembre 2026, complet. Dimanche 29 novembre 2026 à partir de 13h, au Majestic Marina (Sofitel Cotonou) et au Majestic Cinéma Wologuèdè. Réservation sur podlab.beninbouge.com" class="media-cover poster__img" width="1200" height="1500" fetchpriority="high">
+                    {% endif %}
+                    {# Même image, floutée : comble le cadre quand la billetterie est plus haute que l'affiche #}
+                    <img src="{{ affiche ? path('app_affiche', { v: affiche.version }) : asset(constant('App\\Site\\Affiche::ORIGINE')) }}" alt="" aria-hidden="true" class="media-cover poster__fill">
                 </div>
             </div>
 
-            <div class="top__ticketing booking">
+            <div class="top__ticketing booking" data-poster-fit-target="ticketing">
                 <div class="top__head">
                     <p class="eyebrow">Billetterie</p>
-                    <h1 class="top__title">Moi, à quatre pattes&nbsp;?!</h1>
+                    <h1 class="top__title">{{ (vedette ? vedette.titre : constant('App\\Entity\\Evenement::TITRE'))|replace({' ?': ' ?', ' !': ' !'}) }}</h1>
                 </div>
 
                 {{ include('home/_commande.html.twig') }}
@@ -103,6 +113,7 @@
             <p class="hero__intro">Edgar-Yves vit à l'étranger depuis 20 ans et revient au Bénin de temps à autre. Cette année, lors de son séjour, le pays ne l'a pas raté. Pendant deux heures, il raconte avec Beni Tossou des histoires vécues cette année, qu'il n'a jamais racontées nulle part. Enregistré dans les studios Podlab, projeté sur grand écran en partenariat avec Bénin Bouge.</p>
 
             {# Les séances en un coup d'œil #}
+            {% if seances %}
             <ul class="seance-strip" aria-label="Les séances">
                 {% for s in seances %}
                     <li class="seance-strip__item card{{ s.soldOut ? ' is-soldout' }}">
@@ -112,6 +123,8 @@
                     </li>
                 {% endfor %}
             </ul>
+
+            {% endif %}
 
             {# Trailer : se lance au clic (aucun démarrage automatique). Si on dépasse la vidéo en cours de lecture,
                le lecteur passe en miniature dans le coin de l'écran #}
@@ -139,6 +152,7 @@
             </div>
 
             {# Décompte jusqu'à la prochaine séance #}
+            {% if seances %}
             <div class="countdown" data-controller="countdown" data-countdown-target-value="{{ debut_iso }}">
                 <div data-countdown-target="running" {{ decompte.ended ? 'hidden' }}>
                     <p class="countdown__heading">
@@ -169,17 +183,19 @@
                 </div>
             </div>
 
+            {% endif %}
+
             <div class="hero__cta">
                 {% if en_vente %}
                     <a href="#reservation" class="btn btn--primary btn--lg">
-                        Je réserve pour le 29 novembre · dès {{ prix }}&nbsp;FCFA
+                        Je réserve{{ dates_en_vente|length < 30 ? ' pour le ' ~ dates_en_vente }} · dès {{ prix }}&nbsp;FCFA
                         {{ icone_fleche }}
                     </a>
                     <span class="hero__cta-note">Mobile Money ou carte · billet envoyé par e-mail.</span>
                 {% endif %}
-                {% if seance_direct %}
-                    <button type="button" class="btn btn--outline btn--lg" data-open-modal="live-tickets">Le 22, suivre le direct en ligne</button>
-                {% endif %}
+                {% for d in directs %}
+                    <button type="button" class="btn btn--outline btn--lg" data-open-modal="{{ d.fenetre }}">Le {{ d.date }}, suivre le direct en ligne</button>
+                {% endfor %}
             </div>
         </section>
 
@@ -248,9 +264,10 @@
         </section>
 
         {# ---------- Programme ---------- #}
+        {% if programme %}
         <section id="programme" class="container section">
             <p class="eyebrow">Programme</p>
-            <h2 class="h2 u-mb-40">Le déroulé de chaque séance</h2>
+            <h2 class="h2 u-mb-40">Le déroulé de la séance</h2>
             <div class="schedule">
                 {% for etape in programme %}
                     <div class="schedule__row{{ etape.highlight|default(false) ? ' schedule__row--highlight' }}">
@@ -264,39 +281,41 @@
             </div>
         </section>
 
+        {% endif %}
+
         {# ---------- Les salles ---------- #}
+        {% if salles %}
         <section id="lieu" class="container section">
-            <p class="eyebrow">Les salles</p>
-            <h2 class="h2 u-mb-40">Deux cinémas Majestic à Cotonou</h2>
+            <p class="eyebrow">{{ salles|length > 1 ? 'Les salles' : 'La salle' }}</p>
+            <h2 class="h2 u-mb-40">{{ lieux_titre }}</h2>
             <div class="venues">
-                {% for cle, salle in {
-                    marina: { photo: 'images/salle-majestic-marina.webp', alt: 'Fauteuils en velours rouge avec tablettes, salle du Majestic Marina' },
-                    wologuede: { photo: null },
-                } %}
-                    {% set lieu = attribute(constant('App\\Billetterie\\Billetterie::SALLES'), cle) %}
-                    {% set info = seances|filter(s => s.salle.name == lieu.name) %}
+                {% for nom, salle in salles %}
+                    {% set lieu = salle.lieu %}
+                    {% set photo = lieu ? lieu_photo(lieu) : '' %}
                     <article class="venue-card">
-                        {% if salle.photo %}
+                        {% if photo %}
                             <div class="venue-card__media">
-                                <img src="{{ asset(salle.photo) }}" alt="{{ salle.alt }}" class="media-cover" loading="lazy">
+                                <img src="{{ photo }}" alt="{{ lieu.photoAlt ?: nom }}" class="media-cover" style="object-position: {{ lieu.cadrageX }}% {{ lieu.cadrageY }}%" loading="lazy">
                             </div>
                         {% endif %}
                         <div class="venue-card__info">
-                            <h3 class="venue-card__name">{{ lieu.name }}</h3>
-                            <p class="venue-card__sub">{{ lieu.sub }}</p>
-                            <p class="venue__address">{{ icone_lieu }} {{ lieu.address }}</p>
+                            <h3 class="venue-card__name">{{ nom }}</h3>
+                            {% if lieu.detail %}<p class="venue-card__sub">{{ lieu.detail }}</p>{% endif %}
+                            {% if lieu.adresse %}<p class="venue__address">{{ icone_lieu }} {{ lieu.adresse }}</p>{% endif %}
                             <ul class="venue-card__dates">
-                                {% for s in info %}
+                                {% for s in salle.seances %}
                                     <li>{{ s.jour }} · {{ s.heure }}{% if s.soldOut %} <span class="soldout-tag soldout-tag--ink">Sold out</span>{% endif %}</li>
                                 {% endfor %}
                             </ul>
-                            <a href="https://www.google.com/maps/search/?api=1&amp;query={{ lieu.maps|url_encode }}" target="_blank" rel="noopener" class="btn btn--dark btn--md">Ouvrir dans Google Maps</a>
+                            <a href="https://www.google.com/maps/search/?api=1&amp;query={{ lieu.recherche|url_encode }}" target="_blank" rel="noopener" class="btn btn--dark btn--md">Ouvrir dans Google Maps</a>
                         </div>
                     </article>
                 {% endfor %}
             </div>
-            <p class="venues__lead">Fauteuils de cinéma, grand écran, son de salle&nbsp;: le cadre d'une vraie première.</p>
+            {% if lieux_phrase %}<p class="venues__lead">{{ lieux_phrase }}</p>{% endif %}
         </section>
+
+        {% endif %}
 
         {# ---------- Partenaires ---------- #}
         <section class="container section">
@@ -326,138 +345,18 @@
     {# Barre d'action collante (mobile) : visible une fois la billetterie du haut dépassée #}
     <div class="sticky-cta" data-controller="sticky-cta" data-sticky-cta-watch-value='["#reservation", ".hero__cta"]'>
         {% if en_vente %}
-            <a href="#reservation" class="btn btn--primary">Réserver le 29 nov. · dès {{ prix }}&nbsp;FCFA</a>
-        {% elseif seance_direct %}
-            <button type="button" class="btn btn--primary" data-open-modal="live-tickets">Sold out · Suivre le direct</button>
+            <a href="#reservation" class="btn btn--primary">Réserver · dès {{ prix }}&nbsp;FCFA</a>
+        {% elseif directs %}
+            <button type="button" class="btn btn--primary" data-open-modal="{{ directs[0].fenetre }}">Suivre le direct</button>
         {% else %}
             <a href="#reservation" class="btn btn--primary">Voir la billetterie</a>
         {% endif %}
     </div>
 
-    {# ---------- Pop-up : accès au direct du 22 novembre (3 validations) + achat ----------
-         S'ouvre à chaque clic sur un bouton data-open-modal="live-tickets" (plus d'ouverture
-         automatique : la page met désormais en avant les séances du 29).
-         Parcours : annonce → 1. principe → 2. règles → 3. engagement → achat (formulaire Tickafrica). #}
-    {% if seance_direct %}
-    <dialog
-        class="modal"
-        data-controller="modal steps"
-        data-modal-id-value="live-tickets"
-        data-modal-auto-open-value="false"
-        data-steps-storage-key-value="live-purchase-steps"
-        data-action="click->modal#backdrop close->modal#closed close->steps#reset change->steps#sync"
-        aria-labelledby="live-tickets-title"
-    >
-        <div class="modal__box">
-            <button type="button" class="modal__close" data-action="modal#close" aria-label="Fermer la fenêtre">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
-            </button>
-
-            {# ===== Annonce ===== #}
-            <section class="step" data-steps-target="panel">
-                <p class="modal__badge">Sold out</p>
-                <p class="eyebrow">Dimanche 22 novembre · Majestic Marina</p>
-                <h2 id="live-tickets-title" class="modal__title" tabindex="-1">La séance du 22 est complète</h2>
-                <p class="modal__text">
-                    Mais vous pouvez la vivre en direct, depuis chez vous&nbsp;: <strong>l'accès au direct est en vente</strong>, le dimanche 22 novembre 2026, <strong>aux mêmes heures que la projection (13h00 – 15h00, heure du Bénin)</strong>.
-                </p>
-                <p class="modal__text">Avant d'acheter, prenez une minute pour comprendre comment fonctionne le direct&nbsp;: trois courtes étapes.</p>
-                {% if en_vente %}
-                    <p class="modal__text">Vous préférez la salle&nbsp;? <a href="#reservation" data-action="modal#close">Il reste des places le dimanche 29 novembre</a>.</p>
-                {% endif %}
-                <div class="step__actions">
-                    <button type="button" class="btn btn--primary" data-action="steps#start">Acheter un accès au direct</button>
-                    <button type="button" class="btn btn--quiet" data-action="modal#close">Plus tard</button>
-                </div>
-            </section>
-
-            {# ===== Étape 1 : le principe ===== #}
-            <section class="step" data-steps-target="panel" hidden>
-                <p class="step__count">Étape 1 sur 3 <span class="step__bar" aria-hidden="true"><i class="is-on"></i><i></i><i></i></span></p>
-                <h2 class="modal__title" tabindex="-1">Le principe&nbsp;: un direct, à heure fixe</h2>
-                <ol class="timeline">
-                    <li class="timeline__item">
-                        <p class="timeline__when">Avant le direct</p>
-                        <p class="timeline__what">Il n'y a rien à voir. Si vous arrivez avant l'heure, un décompte vous attend.</p>
-                    </li>
-                    <li class="timeline__item timeline__item--live">
-                        <p class="timeline__when">Pendant le direct · 13h00 – 15h00</p>
-                        <p class="timeline__what">Vous rejoignez le direct <strong>là où nous en sommes</strong>. Ce qui s'est passé avant votre arrivée, vous ne le rattrapez pas.</p>
-                    </li>
-                    <li class="timeline__item">
-                        <p class="timeline__when">Après le direct</p>
-                        <p class="timeline__what"><strong>C'est fini.</strong> Il n'y a ni rediffusion ni replay : la page ne donne plus accès à la vidéo.</p>
-                    </li>
-                </ol>
-                <div class="step__actions">
-                    <button type="button" class="btn btn--quiet" data-action="steps#back">Retour</button>
-                    <button type="button" class="btn btn--primary" data-action="steps#next">Continuer</button>
-                </div>
-            </section>
-
-            {# ===== Étape 2 : les règles ===== #}
-            <section class="step" data-steps-target="panel" hidden>
-                <p class="step__count">Étape 2 sur 3 <span class="step__bar" aria-hidden="true"><i class="is-on"></i><i class="is-on"></i><i></i></span></p>
-                <h2 class="modal__title" tabindex="-1">Les règles du direct</h2>
-                <ul class="bullets step__list">
-                    <li><strong>Pas de pause, pas de retour en arrière.</strong> Le lecteur ne propose que le volume et le plein écran.</li>
-                    <li><strong>Pas de rediffusion.</strong> Une fois le direct terminé, la vidéo n'est plus accessible.</li>
-                    <li><strong>Un code, un appareil à la fois.</strong> Si vous vous connectez ailleurs avec le même code, le premier appareil est déconnecté.</li>
-                    <li><strong>Prévoyez une bonne connexion</strong> (Wi-Fi ou 4G). Si elle coupe, vous reprenez le direct là où il en est.</li>
-                    <li>Votre code d'accès vous est envoyé avec votre billet. Le jour J, saisissez-le sur la page du direct.</li>
-                </ul>
-                <div class="step__actions">
-                    <button type="button" class="btn btn--quiet" data-action="steps#back">Retour</button>
-                    <button type="button" class="btn btn--primary" data-action="steps#next">Continuer</button>
-                </div>
-            </section>
-
-            {# ===== Étape 3 : avertissement ===== #}
-            <section class="step" data-steps-target="panel" hidden>
-                <p class="step__count">Étape 3 sur 3 <span class="step__bar" aria-hidden="true"><i class="is-on"></i><i class="is-on"></i><i class="is-on"></i></span></p>
-                <h2 class="modal__title" tabindex="-1">Avertissement&nbsp;: ce direct est protégé</h2>
-                <div class="step__warning" role="note">
-                    <p><strong>Toute capture d'écran, tout enregistrement, toute copie ou diffusion du direct est strictement interdit</strong>, en tout ou en partie, y compris sur les réseaux sociaux ou les messageries.</p>
-                    {% if watermark %}<p>Chaque accès est identifié&nbsp;: le numéro de votre billet s'affiche sur la vidéo. Toute fuite peut être retracée jusqu'à votre billet.</p>{% endif %}
-                    <p><strong>Toute personne qui enregistre ou diffuse le direct s'expose à des poursuites judiciaires.</strong></p>
-                </div>
-                <label class="step__check">
-                    <input type="checkbox" data-steps-target="check">
-                    <span>J'ai compris le principe et les règles du direct (avant, rien&nbsp;; pendant, je rejoins là où ils en sont&nbsp;; après, c'est fini). Je m'engage à ne pas capturer, enregistrer ni diffuser le direct, et je suis conscient(e) des poursuites judiciaires encourues.</span>
-                </label>
-                <div class="step__actions">
-                    <button type="button" class="btn btn--quiet" data-action="steps#back">Retour</button>
-                    <button type="button" class="btn btn--primary" data-steps-target="next" data-action="steps#next" disabled>Valider et passer à l'achat</button>
-                </div>
-            </section>
-
-            {# ===== Achat ===== #}
-            <section class="step" data-steps-target="panel" hidden>
-                <p class="eyebrow">Paiement · dimanche 22 novembre, 13h00 – 15h00</p>
-                <h2 class="modal__title modal__title--compact" tabindex="-1">Achetez votre accès au direct</h2>
-
-                {% if live_ticket_url %}
-                    <div class="modal__embed" data-controller="tickafrica">
-                        <iframe
-                            data-lazy-src="{{ live_ticket_url }}"
-                            title="Billetterie des accès au direct"
-                            class="modal__iframe"
-                            height="120"
-                            data-tickafrica-target="frame"
-                        ></iframe>
-                    </div>
-                    <p class="modal__note">Votre code d'accès au direct vous est envoyé avec votre billet. Le jour J, saisissez-le sur <a href="{{ path('app_live') }}">la page du direct</a> : un code ne fonctionne que sur un appareil à la fois.</p>
-                {% else %}
-                    <p class="modal__soon">La billetterie des accès au direct ouvre très bientôt. Revenez sur cette page ou suivez Podlab et Bénin Bouge pour l'annonce.</p>
-                {% endif %}
-
-                <div class="step__actions">
-                    <button type="button" class="btn btn--quiet" data-action="steps#back">Relire les règles</button>
-                </div>
-            </section>
-        </div>
-    </dialog>
-    {% endif %}
+    {# ---------- Pop-up de chaque direct : validations puis achat ---------- #}
+    {% for d in directs %}
+        {{ include('home/_direct.html.twig', { d: d, seance: d.evenement ? (seances[d.evenement.cle] ?? null) : null }) }}
+    {% endfor %}
 
     {# ---------- Footer ---------- #}
     <footer class="container site-footer">

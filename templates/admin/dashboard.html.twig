@@ -6,40 +6,58 @@
 {% block admin_content %}
     <h1 class="adm-h1">Tableau de bord</h1>
 
+    {% if not tickafrica_key %}<p class="adm-alert adm-alert--error">Aucune clé API Tick Africa : aucun nouveau billet ne peut être validé et la billetterie des séances est à l'arrêt. <a href="{{ path('app_admin_settings') }}">Saisir la clé</a></p>{% elseif tickafrica_test %}<p class="adm-alert adm-alert--error">La clé Tick Africa est une clé de <strong>test</strong> : seuls les billets de test sont acceptés.</p>{% endif %}
+
     <section class="adm-grid">
         <article class="adm-card">
             <p class="adm-card__label">Direct</p>
-            <p class="adm-card__big">
-                {% if not enabled %}Accès fermé{% elseif phase == 'avant' %}Pas encore ouvert{% elseif phase == 'ouvert' %}Ouvert{% else %}Terminé{% endif %}
-            </p>
-            <p class="adm-muted">
-                Du {{ opens_at|date('d/m/Y H:i', 'Africa/Porto-Novo') }} au {{ ends_at|date('d/m/Y H:i', 'Africa/Porto-Novo') }} (heure du Bénin)
-            </p>
-            {% if not enabled %}<p class="adm-alert adm-alert--error">L'interrupteur « accès ouvert » est désactivé : aucun billet ne donne accès.</p>{% endif %}
-            {% if not tickafrica_key %}<p class="adm-alert adm-alert--error">Aucune clé API Tick Africa : aucun nouveau billet ne peut être validé et la billetterie des séances est à l'arrêt. <a href="{{ path('app_admin_settings') }}">Saisir la clé</a></p>{% elseif tickafrica_test %}<p class="adm-alert adm-alert--error">La clé Tick Africa est une clé de <strong>test</strong> : seuls les billets de test sont acceptés.</p>{% endif %}
-            {% if not tickafrica_event %}<p class="adm-alert adm-alert--error">L'événement Tick Africa du direct n'est pas renseigné : aucun nouveau billet ne peut être validé. <a href="{{ path('app_admin_settings') }}">Le renseigner</a></p>{% endif %}
-            {% if not youtube_ok %}<p class="adm-alert adm-alert--error">Aucune vidéo YouTube n'est configurée. <a href="{{ path('app_admin_settings') }}">Renseigner le lien</a></p>{% endif %}
+            {% if direct %}
+                <p class="adm-card__big">
+                    {% if not direct.accesOuvert %}Accès fermé{% elseif phase == 'avant' %}Pas encore ouvert{% elseif phase == 'en_cours' %}Ouvert{% else %}Terminé{% endif %}
+                </p>
+                <p class="adm-muted">
+                    <a href="{{ path('app_admin_direct', {id: direct.id}) }}">{{ direct.titre }}</a><br>
+                    Du {{ direct.ouverture|date('d/m/Y H:i', 'Africa/Porto-Novo') }} au {{ direct.fin|date('d/m/Y H:i', 'Africa/Porto-Novo') }} (heure du Bénin)
+                </p>
+                {% if phase != 'termine' %}
+                    {% if not direct.accesOuvert %}<p class="adm-alert adm-alert--error">L'interrupteur « accès ouvert » est désactivé : aucun billet ne donne accès.</p>{% endif %}
+                    {% if not direct.tickafricaEventId %}<p class="adm-alert adm-alert--error">L'événement Tick Africa du direct n'est pas renseigné : aucun nouveau billet ne peut être validé. <a href="{{ path('app_admin_direct', {id: direct.id}) }}">Le renseigner</a></p>{% endif %}
+                    {% if not direct.youtube %}<p class="adm-alert adm-alert--error">Aucune vidéo YouTube n'est configurée. <a href="{{ path('app_admin_direct', {id: direct.id}) }}">Renseigner le lien</a></p>{% endif %}
+                {% endif %}
+            {% else %}
+                <p class="adm-card__big">Aucun</p>
+                <p class="adm-muted"><a href="{{ path('app_admin_direct_nouveau') }}">Ajouter un direct</a></p>
+            {% endif %}
         </article>
 
-        <article class="adm-card">
-            <p class="adm-card__label">Connectés maintenant</p>
-            <p class="adm-card__big">{{ stats.active }}</p>
-            <p class="adm-muted">Billets actifs dans les 90 dernières secondes</p>
-        </article>
+        {% if stats %}
+            <article class="adm-card">
+                <p class="adm-card__label">Connectés maintenant</p>
+                <p class="adm-card__big">{{ stats.active }}</p>
+                <p class="adm-muted">Billets actifs dans les 90 dernières secondes</p>
+            </article>
 
-        <article class="adm-card">
-            <p class="adm-card__label">Billets validés</p>
-            <p class="adm-card__big">{{ stats.total }}</p>
-            <p class="adm-muted">Billets Tick Africa saisis sur le direct · {{ stats.revoked }} révoqué(s)</p>
-        </article>
+            <article class="adm-card">
+                <p class="adm-card__label">Billets validés</p>
+                <p class="adm-card__big">{{ stats.total }}</p>
+                <p class="adm-muted">Billets Tick Africa saisis pour ce direct · {{ stats.revoked }} révoqué(s)</p>
+            </article>
+        {% endif %}
     </section>
 
     <section class="adm-card">
-        <h2 class="adm-h2">Raccourcis</h2>
+        <h2 class="adm-h2">Prochains évènements</h2>
+        {% for s in seances %}
+            <p>{{ s.jourCourt }} · {{ s.heure }} · {{ s.salle.name }}
+                <span class="adm-seance__state adm-seance__state--{{ s.status }}">{{ constant('App\\Billetterie\\Seance::ETATS')[s.status] }}</span></p>
+        {% else %}
+            <p class="adm-muted">Aucun évènement à venir n'est affiché sur le site.</p>
+        {% endfor %}
         <p class="adm-actions">
-            <a class="adm-btn adm-btn--primary" href="{{ path('app_admin_codes') }}">Gérer les billets</a>
-            <a class="adm-btn" href="{{ path('app_admin_settings') }}">Modifier les paramètres</a>
-            <a class="adm-btn" href="{{ path('app_admin_codes_export') }}">Exporter les billets (CSV)</a>
+            <a class="adm-btn adm-btn--primary" href="{{ path('app_admin_evenement_nouveau') }}">Ajouter un évènement</a>
+            <a class="adm-btn" href="{{ path('app_admin_evenements') }}">Gérer les évènements</a>
+            <a class="adm-btn" href="{{ path('app_admin_directs') }}">Gérer les directs</a>
+            <a class="adm-btn" href="{{ path('app_admin_codes') }}">Gérer les billets</a>
         </p>
     </section>
 {% endblock %}

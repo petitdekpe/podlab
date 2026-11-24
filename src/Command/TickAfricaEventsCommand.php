@@ -2,9 +2,9 @@
 
 namespace App\Command;
 
-use App\Live\LiveSettings;
 use App\Live\TickAfrica;
 use App\Live\TickAfricaUnavailable;
+use App\Programme\Programme;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -12,12 +12,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand(name: 'app:tickafrica:events', description: 'Liste vos événements Tick Africa et leur identifiant (à reporter dans TICKAFRICA_EVENT_ID ou dans /admin)')]
+#[AsCommand(name: 'app:tickafrica:events', description: 'Liste vos événements Tick Africa et leur identifiant (à reporter dans /admin)')]
 final class TickAfricaEventsCommand extends Command
 {
     public function __construct(
         private readonly TickAfrica $tickAfrica,
-        private readonly LiveSettings $settings,
+        private readonly Programme $programme,
     ) {
         parent::__construct();
     }
@@ -45,12 +45,22 @@ final class TickAfricaEventsCommand extends Command
             return Command::SUCCESS;
         }
 
-        $current = $this->settings->tickafricaEventId();
-        $io->table(['Identifiant', 'Événement', 'Début', ''], array_map(static fn (array $e): array => [
+        $usages = [];
+        foreach ($this->programme->tousEvenements() as $evenement) {
+            $usages[$evenement->tickafricaEventId][] = $evenement->libelle();
+        }
+        try {
+            foreach ($this->programme->tousDirects() as $direct) {
+                $usages[$direct->tickafricaEventId][] = 'direct : '.$direct->titre;
+            }
+        } catch (\Throwable) {
+            $io->warning('Base injoignable : directs non affichés.');
+        }
+        $io->table(['Identifiant', 'Événement', 'Début', 'Utilisé sur le site'], array_map(static fn (array $e): array => [
             (string) ($e['id'] ?? ''),
             (string) ($e['name'] ?? ''),
             (string) ($e['starts_at'] ?? ''),
-            ($e['id'] ?? null) === $current ? '← direct' : '',
+            implode("\n", $usages[strtolower((string) ($e['id'] ?? ''))] ?? []),
         ], $events));
 
         if ($this->tickAfrica->isTestMode()) {

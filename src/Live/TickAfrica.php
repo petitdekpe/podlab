@@ -128,6 +128,29 @@ final class TickAfrica
     }
 
     /**
+     * Événements de la clé, pour proposer leurs identifiants dans les formulaires de
+     * /admin. Vide si la clé manque ou si Tick Africa ne répond pas.
+     *
+     * @return list<array{id: string, label: string}>
+     */
+    public function eventChoices(): array
+    {
+        if (!$this->isConfigured()) {
+            return [];
+        }
+        try {
+            $events = $this->events();
+        } catch (TickAfricaUnavailable) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(static fn (array $e): array => [
+            'id' => (string) ($e['id'] ?? ''),
+            'label' => trim(sprintf('%s · %s', $e['name'] ?? '', substr((string) ($e['starts_at'] ?? ''), 0, 16))),
+        ], $events), static fn (array $e): bool => '' !== $e['id']));
+    }
+
+    /**
      * Un événement, ses dates et ses types de billets avec la disponibilité
      * en temps réel (portée events:read). 404 si l'événement n'est pas à vous.
      *

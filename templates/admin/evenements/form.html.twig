@@ -1,0 +1,123 @@
+{% extends 'admin/layout.html.twig' %}
+{% set active = 'evenements' %}
+{% set titre_page = evenement.id ? 'Modifier l\'évènement' : 'Ajouter un évènement' %}
+
+{% block admin_title %}{{ titre_page }}{% endblock %}
+
+{% block admin_content %}
+    <div class="adm-head">
+        <h1 class="adm-h1">{{ titre_page }}</h1>
+        <a class="adm-btn" href="{{ path('app_admin_evenements') }}">← Évènements</a>
+    </div>
+
+    {% for erreur in erreurs %}
+        <p class="adm-alert adm-alert--error" role="alert">{{ erreur }}</p>
+    {% endfor %}
+
+    <form method="post" class="adm-card adm-form adm-form--wide">
+        <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+
+        <label class="adm-label" for="titre">Titre</label>
+        <input id="titre" name="titre" type="text" class="adm-input" maxlength="120" value="{{ form.titre }}" required>
+
+        <div class="adm-row">
+            <div>
+                <label class="adm-label" for="debut">Début</label>
+                <input id="debut" name="debut" type="datetime-local" class="adm-input" value="{{ form.debut }}" required>
+            </div>
+            <div>
+                <label class="adm-label" for="fin">Fin (facultatif)</label>
+                <input id="fin" name="fin" type="datetime-local" class="adm-input" value="{{ form.fin }}">
+            </div>
+        </div>
+        <div class="adm-row">
+            <div>
+                <label class="adm-label" for="portes">Accueil du public (facultatif)</label>
+                <input id="portes" name="portes" type="time" class="adm-input" value="{{ form.portes }}">
+            </div>
+            <div>
+                <label class="adm-label" for="fermeture">Fermeture des portes (facultatif)</label>
+                <input id="fermeture" name="fermeture" type="time" class="adm-input" value="{{ form.fermeture }}">
+            </div>
+        </div>
+        <p class="adm-help">Heure du Bénin. L'accueil et la fermeture des portes apparaissent dans le programme et sur la page de confirmation.</p>
+
+        <h2 class="adm-h2 adm-h2--section">Lieu</h2>
+        {% if lieux is empty %}
+            <p class="adm-alert adm-alert--error">Aucun lieu n'existe encore. <a href="{{ path('app_admin_lieu_nouveau') }}">Ajouter un lieu</a></p>
+        {% endif %}
+        <div class="adm-row">
+            <div>
+                <label class="adm-label" for="lieu">Lieu</label>
+                <select id="lieu" name="lieu" class="adm-input" required>
+                    <option value="">Choisir…</option>
+                    {% for l in lieux %}<option value="{{ l.id }}"{{ form.lieu == l.id ~ '' ? ' selected' }}>{{ l.nom }}</option>{% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="adm-label" for="capacite">Capacité (facultatif)</label>
+                <input id="capacite" name="capacite" type="text" inputmode="numeric" pattern="[0-9 ]*" class="adm-input" value="{{ form.capacite }}" placeholder="Celle du lieu" autocomplete="off">
+            </div>
+        </div>
+        <p class="adm-help">Adresse, photo et capacité se règlent sur le lieu&nbsp;: <a href="{{ path('app_admin_lieux') }}">gérer les lieux</a>. Indiquez ici une capacité seulement si elle diffère pour cet évènement.</p>
+
+        <h2 class="adm-h2 adm-h2--section">Billetterie Tick Africa</h2>
+        <datalist id="tickafrica-events">
+            {% for event in tickafrica_events %}<option value="{{ event.id }}">{{ event.label }}</option>{% endfor %}
+        </datalist>
+        <div class="adm-row">
+            <div>
+                <label class="adm-label" for="event">Événement Tick Africa</label>
+                <input id="event" name="event" type="text" class="adm-input" list="tickafrica-events" value="{{ form.event }}" placeholder="9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d" autocomplete="off" spellcheck="false">
+            </div>
+            <div>
+                <label class="adm-label" for="tarifs">Billets à vendre (facultatif)</label>
+                <input id="tarifs" name="tarifs" type="text" class="adm-input" value="{{ form.tarifs }}" placeholder="Tous les billets de l'événement" autocomplete="off" spellcheck="false">
+            </div>
+        </div>
+        <p class="adm-help">
+            {% if tickafrica_events %}Cliquez dans le champ pour choisir parmi vos événements Tick Africa. {% endif %}Tant que le champ est vide, l'évènement est affiché «&nbsp;Bientôt&nbsp;».
+            Si deux séances partagent un même événement, indiquez pour chacune l'identifiant de son billet (plusieurs&nbsp;: séparés par des virgules).
+        </p>
+        {% if etat and (etat.eventName or etat.reason) %}
+            <p class="adm-help">
+                {% if etat.eventName %}Événement trouvé chez Tick Africa&nbsp;: <strong>{{ etat.eventName }}</strong>.{% endif %}
+                {% if etat.reason %}<strong>{{ constant('App\\Billetterie\\Seance::ETATS')[etat.status] }}.</strong> {{ constant('App\\Billetterie\\Seance::REASONS')[etat.reason] ?? etat.reason }}{% endif %}
+            </p>
+        {% endif %}
+        {% if etat and etat.tarifs %}
+            <p class="adm-help">
+                {% for t in etat.tarifs %}
+                    {{ t.name }} · {{ t.price|number_format(0, ',', ' ') }} FCFA · {{ t.remaining is null ? 'illimité' : t.remaining ~ ' restante(s)' }} · <code>{{ t.id }}</code>{% if not loop.last %}<br>{% endif %}
+                {% endfor %}
+            </p>
+        {% endif %}
+
+        <h2 class="adm-h2 adm-h2--section">Affichage</h2>
+        <label class="adm-check">
+            <input type="checkbox" name="publie" value="1"{{ form.publie ? ' checked' }}>
+            <span><strong>Affiché sur le site</strong><br><span class="adm-muted">Décochez pour préparer l'évènement sans le montrer, ou pour retirer un évènement passé.</span></span>
+        </label>
+        <label class="adm-check">
+            <input type="checkbox" name="complet" value="1"{{ form.complet ? ' checked' }}>
+            <span><strong>«&nbsp;Sold out&nbsp;»</strong><br><span class="adm-muted">Affiche l'évènement complet et ferme sa vente sur le site, quelles que soient les places restantes chez Tick Africa.</span></span>
+        </label>
+        <label class="adm-check">
+            <input type="checkbox" name="bilan" value="1"{{ form.bilan ? ' checked' }}>
+            <span><strong>Compté dans le bilan des ventes</strong><br><span class="adm-muted">Page /ventes.</span></span>
+        </label>
+
+        <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary">Enregistrer</button></p>
+    </form>
+
+    {% if evenement.id %}
+        <section class="adm-card">
+            <h2 class="adm-h2">Aller plus loin</h2>
+            <p class="adm-muted">Lien direct vers cette séance&nbsp;: <code>{{ url('app_home', {seance: evenement.cle}) }}#reservation</code></p>
+            <p class="adm-actions">
+                <a class="adm-btn" href="{{ path('app_admin_direct_nouveau', {evenement: evenement.id}) }}">Créer un direct pour cette séance</a>
+                <a class="adm-btn" href="{{ path('app_admin_evenement_nouveau', {copie: evenement.id}) }}">Dupliquer</a>
+            </p>
+        </section>
+    {% endif %}
+{% endblock %}

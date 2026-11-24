@@ -2,13 +2,15 @@
 
 namespace App\Tests;
 
-use App\Entity\Setting;
-use App\Live\LiveConfig;
-use App\Live\LiveSettings;
+use App\Entity\Evenement;
+use App\Entity\Lieu;
+use App\Programme\Programme;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
+use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -70,7 +72,7 @@ final class VentesTest extends WebTestCase
 
     public function testSalesAndFillingAreTwoDifferentRates(): void
     {
-        $crawler = $this->bilan($this->client(['capacite_marina-28' => '200', 'capacite_wologuede-28' => '100']));
+        $crawler = $this->bilan($this->client(['marina-28' => 200, 'wologuede-28' => 100]));
 
         self::assertSame([
             // vendus, ventes (sur les tickets mis en vente), remplissage (sur la capacité)
@@ -86,7 +88,7 @@ final class VentesTest extends WebTestCase
     public function testFillingIsUnknownWithoutCapacity(): void
     {
         // Une seule capacité saisie : jamais remplacée par les tickets mis en vente, pas de total partiel
-        $blocs = $this->blocs($this->bilan($this->client(['capacite_marina-28' => '200'])));
+        $blocs = $this->blocs($this->bilan($this->client(['marina-28' => 200])));
 
         self::assertSame('Remplissage — capacité à saisir dans /admin', $blocs[0][2]);
         self::assertSame('Remplissage 3,5 % sur 200 places au total', $blocs[1][2]);
@@ -104,7 +106,7 @@ final class VentesTest extends WebTestCase
 
     public function testMoreTicketsThanSeatsIsReported(): void
     {
-        $crawler = $this->bilan($this->client(['capacite_marina-28' => '80', 'capacite_wologuede-28' => '100']));
+        $crawler = $this->bilan($this->client(['marina-28' => 80, 'wologuede-28' => 100]));
 
         self::assertStringContainsString('100 tickets mis en vente pour 80 places', $crawler->filter('.adm-main')->text());
     }
@@ -144,23 +146,27 @@ final class VentesTest extends WebTestCase
     }
 
     /**
-     * @param array<string, string>|null $settings réglages de /admin simulés (null : base absente)
+     * @param array<string, int>|null $capacites évènements simulés en base, avec la capacité de leur salle (null : base absente)
      * @param array<string, int>         $champs   champs ajoutés aux billets
      */
-    private function client(?array $settings = null, array $champs = []): KernelBrowser
+    private function client(?array $capacites = null, array $champs = []): KernelBrowser
     {
         $client = static::createClient();
         $client->disableReboot();
-        if (null !== $settings) {
+        if (null !== $capacites) {
             $repository = $this->createStub(EntityRepository::class);
-            $repository->method('findAll')->willReturn(array_map(
-                static fn (string $name, string $value): Setting => new Setting($name, $value),
-                array_keys($settings),
-                $settings,
-            ));
+            $repository->method('findBy')->willReturn(array_map(static function (array $l) use ($capacites): Evenement {
+                $e = new Evenement($l[0], new \DateTimeImmutable('2026-11-29T13:00:00+01:00'));
+                $e->lieu = new Lieu($l[1]);
+                $e->relier($l[2]);
+                $e->capacite = $capacites[$l[0]] ?? null;
+                $e->bilan = 'hors-bilan' !== $l[0];
+
+                return $e;
+            }, [['marina-28', 'Majestic Marina', self::MARINA], ['wologuede-28', 'Majestic Wologuèdè', self::WOLO], ['hors-bilan', 'Ailleurs', self::WOLO]]));
             $em = $this->createStub(EntityManagerInterface::class);
             $em->method('getRepository')->willReturn($repository);
-            static::getContainer()->set(LiveSettings::class, new LiveSettings($em, static::getContainer()->get(LiveConfig::class)));
+            static::getContainer()->set(Programme::class, new Programme($em, new ArrayAdapter(), new NullLogger()));
         }
         $now = new \DateTimeImmutable();
 

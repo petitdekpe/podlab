@@ -2,6 +2,7 @@
 
 namespace App\Live;
 
+use App\Entity\Direct;
 use App\Entity\LiveCode;
 use App\Repository\LiveCodeRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -22,7 +23,6 @@ final class LiveCodes
         private readonly LiveCodeRepository $repository,
         private readonly EntityManagerInterface $em,
         private readonly TickAfrica $tickAfrica,
-        private readonly LiveSettings $settings,
     ) {
     }
 
@@ -38,10 +38,10 @@ final class LiveCodes
         return explode(':', $cleaned, 2)[0];
     }
 
-    /** Billet déjà validé sur ce site. */
-    public function find(string $code): ?LiveCode
+    /** Billet déjà validé sur ce site, pour ce direct. */
+    public function find(Direct $direct, string $code): ?LiveCode
     {
-        return $this->repository->findOneByCode($code);
+        return $this->repository->findOneByCode($direct, $code);
     }
 
     /**
@@ -51,23 +51,22 @@ final class LiveCodes
      *
      * @throws TickAfricaUnavailable
      */
-    public function redeem(string $input): LiveCode|TicketVerdict
+    public function redeem(Direct $direct, string $input): LiveCode|TicketVerdict
     {
         if (!preg_match(self::INPUT_PATTERN, $input)) {
             return TicketVerdict::refused('invalid_code');
         }
 
-        $eventId = $this->settings->tickafricaEventId();
-        if ('' === $eventId) {
+        if ('' === $direct->tickafricaEventId) {
             // Sans événement, un billet de la salle serait accepté… et son entrée enregistrée
             throw new TickAfricaUnavailable('Événement Tick Africa du direct non configuré.');
         }
 
-        $verdict = $this->tickAfrica->validate($input, $eventId);
+        $verdict = $this->tickAfrica->validate($input, $direct->tickafricaEventId);
 
         if (!$verdict->valid) {
             // Déjà entré… peut-être par ce site (saisie simultanée sur deux appareils, autre casse)
-            if ('already_used' === $verdict->reason && null !== $verdict->code && null !== ($known = $this->find($verdict->code))) {
+            if ('already_used' === $verdict->reason && null !== $verdict->code && null !== ($known = $this->find($direct, $verdict->code))) {
                 return $known;
             }
 
@@ -75,10 +74,10 @@ final class LiveCodes
         }
 
         $key = $verdict->code ?? self::key($input);
-        $code = $this->find($key);
+        $code = $this->find($direct, $key);
 
         if (null === $code) {
-            $code = new LiveCode($key, $verdict->label());
+            $code = new LiveCode($direct, $key, $verdict->label());
             $this->em->persist($code);
             $this->em->flush();
         }

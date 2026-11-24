@@ -3,9 +3,9 @@
 namespace App\Command;
 
 use App\Live\LiveCodes;
-use App\Live\LiveSettings;
 use App\Live\TickAfrica;
 use App\Live\TickAfricaUnavailable;
+use App\Programme\Programme;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -18,7 +18,7 @@ final class TickAfricaCheckCommand extends Command
 {
     public function __construct(
         private readonly TickAfrica $tickAfrica,
-        private readonly LiveSettings $settings,
+        private readonly Programme $programme,
         private readonly LiveCodes $codes,
     ) {
         parent::__construct();
@@ -33,7 +33,8 @@ final class TickAfricaCheckCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
         $code = LiveCodes::clean((string) $input->getArgument('code'));
-        $eventId = $this->settings->tickafricaEventId();
+        $direct = $this->programme->directActuel();
+        $eventId = $direct?->tickafricaEventId ?? '';
 
         if ('' === $eventId) {
             $io->warning('Aucun événement du direct configuré : la vérification porte sur tous vos événements.');
@@ -55,7 +56,7 @@ final class TickAfricaCheckCommand extends Command
             ['Billet' => $verdict->ticketType ?? '—'],
             ['Événement' => $verdict->eventName ?? '—'],
             ['Entré le' => $verdict->enteredAt ?? '—'],
-            ['Déjà validé sur ce site' => null !== $this->codes->find($verdict->code ?? LiveCodes::key($code)) ? 'oui' : 'non'],
+            ['Déjà validé sur ce site' => null !== $direct && null !== $this->codes->find($direct, $verdict->code ?? LiveCodes::key($code)) ? 'oui' : 'non'],
         );
 
         return $verdict->valid ? Command::SUCCESS : Command::FAILURE;

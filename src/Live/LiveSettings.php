@@ -4,21 +4,23 @@ namespace App\Live;
 
 use App\Entity\Setting;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
- * Paramètres effectifs du direct : valeur saisie dans l'administration
- * (table app_setting) ou, à défaut, valeur de l'environnement.
+ * Paramètres généraux du site : valeur saisie dans l'administration (table
+ * app_setting) ou, à défaut, valeur de l'environnement. Évènements et directs
+ * ont leurs propres tables (voir Programme).
  */
-final class LiveSettings
+final class LiveSettings implements ResetInterface
 {
     public const TIMEZONE = 'Africa/Porto-Novo';
+    /** Section « Les salles » de l'accueil */
+    public const LIEUX_TITRE = 'Où nous retrouver';
+    public const LIEUX_PHRASE = 'Fauteuils de cinéma, grand écran, son de salle : le cadre d\'une vraie première.';
     public const DEFAULT_TITLE = 'Edgar-Yves : Moi, à quatre pattes ?!';
 
     /** @var array<string, string|null>|null */
     private ?array $values = null;
-
-    /** Séances du site dont l'événement Tick Africa se règle dans /admin */
-    public const SEANCES = ['marina-22', 'marina-28', 'wologuede-28'];
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -78,25 +80,15 @@ final class LiveSettings
         return preg_replace('#^http://#i', 'https://', $generated) ?? $generated;
     }
 
-    /**
-     * Événement Tick Africa d'une séance saisi dans /admin : « uuid » ou
-     * « uuid:uuid-tarif,uuid-tarif ». '' s'il n'est pas défini.
-     */
-    public function seanceLink(string $seance): string
+    public function lieuxTitre(): string
     {
-        return trim((string) $this->get('seance_'.$seance));
+        return (string) $this->get('lieux_titre') ?: self::LIEUX_TITRE;
     }
 
-    /**
-     * Capacité totale de la salle pour une séance, saisie dans /admin ; null si
-     * non renseignée. Sert au pourcentage de remplissage du bilan /ventes, distinct
-     * du pourcentage des ventes (calculé sur les tickets mis en vente).
-     */
-    public function seanceCapacity(string $seance): ?int
+    /** '' : phrase retirée dans /admin */
+    public function lieuxPhrase(): string
     {
-        $valeur = trim((string) $this->get('capacite_'.$seance));
-
-        return ctype_digit($valeur) && (int) $valeur > 0 ? (int) $valeur : null;
+        return $this->get('lieux_phrase') ?? self::LIEUX_PHRASE;
     }
 
     /** Identifiant de mesure Google Analytics (G-XXXXXXXXXX), ou '' : pas de mesure d'audience. */
@@ -110,59 +102,6 @@ final class LiveSettings
         $value = strtoupper(trim($value));
 
         return preg_match('/^G-[A-Z0-9]{4,20}$/', $value) ? $value : '';
-    }
-
-    public function title(): string
-    {
-        $title = trim((string) $this->get('title'));
-
-        return '' !== $title ? $title : self::DEFAULT_TITLE;
-    }
-
-    public function youtubeId(): string
-    {
-        return self::extractVideoId((string) ($this->get('youtube') ?? $this->defaults->youtube));
-    }
-
-    public function opensAt(): \DateTimeImmutable
-    {
-        return new \DateTimeImmutable((string) ($this->get('opens_at') ?: $this->defaults->opensAt));
-    }
-
-    public function endsAt(): \DateTimeImmutable
-    {
-        return new \DateTimeImmutable((string) ($this->get('ends_at') ?: $this->defaults->endsAt));
-    }
-
-    /** Interrupteur général : à faux, aucun billet ne donne accès (le supercode reste valable). */
-    public function enabled(): bool
-    {
-        return '0' !== $this->get('enabled');
-    }
-
-    public function watermark(): bool
-    {
-        return '0' !== $this->get('watermark');
-    }
-
-    /** Billetterie en salle complète (filtre « Sold out » sur le site). Par défaut : oui. */
-    public function soldOut(): bool
-    {
-        return '0' !== $this->get('soldout');
-    }
-
-    /** Lien de la billetterie des accès au direct (affichée dans la fenêtre pop-up), ou '' s'il n'est pas défini. */
-    public function liveTicketUrl(): string
-    {
-        $url = self::normalizeEmbedUrl((string) $this->get('live_ticket_url'));
-
-        return '' !== $url ? $url : $this->defaultLiveTicketUrl();
-    }
-
-    /** Lien par défaut (variable LIVE_TICKETS_URL), utilisé tant qu'aucun lien n'est saisi dans l'administration. */
-    public function defaultLiveTicketUrl(): string
-    {
-        return self::normalizeEmbedUrl($this->defaults->liveTicketUrl);
     }
 
     /**
@@ -184,20 +123,6 @@ final class LiveSettings
         }
 
         return $url;
-    }
-
-    /** UUID de l'événement Tick Africa du direct (administration, sinon TICKAFRICA_EVENT_ID), ou ''. */
-    public function tickafricaEventId(): string
-    {
-        $id = self::normalizeUuid((string) $this->get('tickafrica_event_id'));
-
-        return '' !== $id ? $id : self::normalizeUuid($this->tickafricaEventIdDefault());
-    }
-
-    /** Valeur par défaut (variable TICKAFRICA_EVENT_ID). */
-    public function tickafricaEventIdDefault(): string
-    {
-        return $this->defaults->tickafricaEventId;
     }
 
     public static function normalizeUuid(string $value): string
@@ -246,6 +171,11 @@ final class LiveSettings
         }
 
         return '';
+    }
+
+    public function reset(): void
+    {
+        $this->values = null;
     }
 
     /** @return array<string, string|null> */

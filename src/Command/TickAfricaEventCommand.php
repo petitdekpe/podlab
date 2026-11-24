@@ -74,7 +74,7 @@ final class TickAfricaEventCommand extends Command
             ($p['is_available'] ?? false) ? 'oui' : 'non',
         ], \is_array($event['products'] ?? null) ? $event['products'] : []));
 
-        $io->note('Pour relier une séance à cet événement : TICKAFRICA_SEANCE_…='.$id.' (ou '.$id.':<uuid-tarif> pour un seul billet).');
+        $io->note('Pour vendre ces billets : /admin › Évènements, champ « Événement Tick Africa » = '.$id.'.');
 
         return Command::SUCCESS;
     }

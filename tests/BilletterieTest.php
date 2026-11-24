@@ -5,10 +5,10 @@ namespace App\Tests;
 use App\Billetterie\Billetterie;
 use App\Billetterie\Commande;
 use App\Billetterie\Seance;
-use App\Live\LiveConfig;
 use App\Live\LiveSettings;
 use App\Live\TickAfrica;
 use App\Live\TickAfricaUnavailable;
+use App\Programme\Programme;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -36,10 +36,9 @@ final class BilletterieTest extends TestCase
         $seances = $billetterie->seances();
 
         self::assertSame(['marina-22', 'marina-28', 'wologuede-28'], array_keys($seances));
-        // 22 : complète par défaut (réglage /admin), avec le direct
+        // Programme d'origine (base absente) : 22 complète, sans direct
         self::assertSame(Seance::COMPLET, $seances['marina-22']->status);
-        // le direct est proposé jusqu'à sa fin (22/11, 16h00), plus après
-        self::assertSame(new \DateTimeImmutable() < new \DateTimeImmutable('2026-11-22T16:00:00+01:00'), $seances['marina-22']->liveAccess);
+        self::assertNull($seances['marina-22']->direct);
         // 29 Marina : en vente, 12 places
         self::assertSame(Seance::EN_VENTE, $seances['marina-28']->status);
         self::assertSame(12, $seances['marina-28']->placesRestantes());
@@ -248,22 +247,19 @@ final class BilletterieTest extends TestCase
             return new MockResponse(json_encode(['error' => 'NOT_FOUND']), ['http_code' => 404]);
         });
 
-        // Base indisponible : les réglages /admin prennent leur valeur par défaut
+        // Base indisponible : programme d'origine
         $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getRepository')->willThrowException(new \RuntimeException('pas de base'));
         $em->method('find')->willThrowException(new \RuntimeException('pas de base'));
         $em->method('createQueryBuilder')->willThrowException(new \RuntimeException('pas de base'));
         $em->method('getConnection')->willThrowException(new \RuntimeException('pas de base'));
-        $settings = new LiveSettings($em, new LiveConfig('', '2026-11-22T12:30:00+01:00', '2099-01-01T00:00:00+01:00', '', ''));
+        $cache ??= new ArrayAdapter();
 
         return new Billetterie(
             new TickAfrica($http, new NullLogger(), 'ta_test_cle'),
-            $settings,
-            $cache ?? new ArrayAdapter(),
+            new Programme($em, new ArrayAdapter(), new NullLogger(), '', $marina ?? self::MARINA, $wologuede ?? self::WOLO),
+            $cache,
             new NullLogger(),
-            '',
-            $marina ?? self::MARINA,
-            $wologuede ?? self::WOLO,
         );
     }
 

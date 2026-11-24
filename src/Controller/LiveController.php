@@ -2,13 +2,15 @@
 
 namespace App\Controller;
 
+use App\Entity\Direct;
 use App\Entity\LiveCode;
 use App\Live\LiveCodes;
 use App\Live\LiveSessions;
-use App\Live\LiveSettings;
 use App\Live\SuperCode;
 use App\Live\TickAfricaUnavailable;
 use App\Live\TicketVerdict;
+use App\Programme\Programme;
+use App\Site\DateFr;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,6 +19,8 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Page de direct : accessible uniquement avec un code de billet Tick Africa (ou le supercode).
+ * Elle présente le direct actuel du Programme ; un billet n'ouvre que le direct pour
+ * lequel il a été validé.
  *
  * L'identifiant de la vidéo YouTube n'est jamais dans le HTML : il n'est
  * fourni par /live/flux qu'à un billet valide, et seulement pendant la
@@ -28,11 +32,8 @@ final class LiveController extends AbstractController
     private const SESSION_KEY = 'live_ticket';
     private const CSRF_ID = 'live';
 
-    private const DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-    private const MONTHS = ['', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-
     public function __construct(
-        private readonly LiveSettings $settings,
+        private readonly Programme $programme,
         private readonly LiveCodes $codes,
         private readonly LiveSessions $sessions,
         private readonly SuperCode $superCode,
@@ -42,15 +43,19 @@ final class LiveController extends AbstractController
     #[Route('', name: 'app_live', methods: ['GET'])]
     public function index(Request $request): Response
     {
-        $now = new \DateTimeImmutable();
-        $opens = $this->settings->opensAt();
-        $viewer = $this->viewer($request);
+        $direct = $this->programme->directActuel();
+        if (null === $direct) {
+            return $this->noStore($this->render('live/index.html.twig', ['etat' => 'aucun', 'title' => null, 'is_super' => false]));
+        }
+
+        $phase = $direct->phase();
+        $viewer = $this->viewer($request, $direct);
 
         $etat = match (true) {
             $viewer['super'] => 'direct',
-            $now >= $this->settings->endsAt() => 'termine',
-            !$this->settings->enabled() => 'ferme',
-            $viewer['valid'] && $now < $opens => 'attente',
+            Direct::TERMINE === $phase => 'termine',
+            !$direct->accesOuvert => 'ferme',
+            $viewer['valid'] && Direct::AVANT === $phase => 'attente',
             $viewer['valid'] => 'direct',
             $viewer['replaced'] => 'remplace',   // billet repris sur un autre appareil
             default => 'verrouille',
@@ -58,11 +63,11 @@ final class LiveController extends AbstractController
 
         return $this->noStore($this->render('live/index.html.twig', [
             'etat' => $etat,
-            'title' => $this->settings->title(),
-            'opens_at' => $opens,
-            'ends_at' => $this->settings->endsAt(),
-            'opens_label' => $this->label($opens),
-            'watermark' => $viewer['super'] ? 'Superadmin' : ($this->settings->watermark() && $viewer['code'] ? 'Billet '.$viewer['code']->getCode() : null),
+            'title' => $direct->titre,
+            'opens_at' => $direct->ouverture(),
+            'ends_at' => $direct->fin(),
+            'opens_label' => DateFr::complet($direct->ouverture()),
+            'watermark' => $viewer['super'] ? 'Superadmin' : ($direct->filigrane && $viewer['code'] ? 'Billet '.$viewer['code']->getCode() : null),
             'is_super' => $viewer['super'],
         ]));
     }
@@ -97,7 +102,8 @@ final class LiveController extends AbstractController
         }
 
         // Direct terminé ou fermé : on ne consomme pas de billet chez Tick Africa
-        if (new \DateTimeImmutable() >= $this->settings->endsAt() || !$this->settings->enabled()) {
+        $direct = $this->programme->directActuel();
+        if (null === $direct || Direct::TERMINE === $direct->phase() || !$direct->accesOuvert) {
             return $this->redirectToRoute('app_live');
         }
 
@@ -106,11 +112,11 @@ final class LiveController extends AbstractController
         }
 
         // Billet déjà validé sur ce site : pas de nouvel appel à Tick Africa
-        $code = $this->codes->find(LiveCodes::key($input));
+        $code = $this->codes->find($direct, LiveCodes::key($input));
 
         if (null === $code) {
             try {
-                $result = $this->codes->redeem($input);
+                $result = $this->codes->redeem($direct, $input);
             } catch (TickAfricaUnavailable) {
                 $this->addFlash('live_error', 'La vérification des billets est momentanément indisponible. Réessayez dans un instant.');
 
@@ -146,7 +152,7 @@ final class LiveController extends AbstractController
     #[Route('/reprendre', name: 'app_live_resume', methods: ['POST'])]
     public function resume(Request $request): Response
     {
-        $code = $this->viewer($request)['code'];
+        $code = $this->viewer($request, $this->programme->directActuel())['code'];
 
         if ($this->isCsrfTokenValid(self::CSRF_ID, (string) $request->request->get('_token'))
             && null !== $code && !$code->isRevoked()) {
@@ -160,7 +166,7 @@ final class LiveController extends AbstractController
     public function logout(Request $request): Response
     {
         if ($this->isCsrfTokenValid(self::CSRF_ID, (string) $request->request->get('_token'))) {
-            $viewer = $this->viewer($request);
+            $viewer = $this->viewer($request, $this->programme->directActuel());
             if ($viewer['valid'] && null !== $viewer['code'] && null !== $viewer['token']) {
                 $this->sessions->release($viewer['code'], $viewer['token']);
             }
@@ -174,17 +180,18 @@ final class LiveController extends AbstractController
     #[Route('/flux', name: 'app_live_flux', methods: ['POST'])]
     public function flux(Request $request): Response
     {
-        $viewer = $this->viewer($request);
+        $direct = $this->programme->directActuel();
+        $viewer = $this->viewer($request, $direct);
 
-        if ($error = $this->guard($request, $viewer)) {
+        if ($error = $this->guard($request, $direct, $viewer)) {
             return $error;
         }
 
-        if (!$viewer['super'] && new \DateTimeImmutable() < $this->settings->opensAt()) {
+        if (!$viewer['super'] && Direct::AVANT === $direct?->phase()) {
             return $this->noStore(new JsonResponse(['error' => 'pas_ouvert'], Response::HTTP_FORBIDDEN));
         }
 
-        $videoId = $this->settings->youtubeId();
+        $videoId = $direct?->youtube ?? '';
         if ('' === $videoId) {
             return $this->noStore(new JsonResponse(['error' => 'non_configure'], Response::HTTP_SERVICE_UNAVAILABLE));
         }
@@ -196,9 +203,10 @@ final class LiveController extends AbstractController
     #[Route('/ping', name: 'app_live_ping', methods: ['POST'])]
     public function ping(Request $request): Response
     {
-        $viewer = $this->viewer($request);
+        $direct = $this->programme->directActuel();
+        $viewer = $this->viewer($request, $direct);
 
-        if ($error = $this->guard($request, $viewer)) {
+        if ($error = $this->guard($request, $direct, $viewer)) {
             return $error;
         }
 
@@ -214,7 +222,7 @@ final class LiveController extends AbstractController
     /**
      * @param array{super: bool, valid: bool, replaced: bool, code: ?LiveCode, token: ?string} $viewer
      */
-    private function guard(Request $request, array $viewer): ?Response
+    private function guard(Request $request, ?Direct $direct, array $viewer): ?Response
     {
         if (!$this->isCsrfTokenValid(self::CSRF_ID, (string) $request->headers->get('X-CSRF-Token'))) {
             return $this->noStore(new JsonResponse(['error' => 'csrf'], Response::HTTP_FORBIDDEN));
@@ -229,11 +237,11 @@ final class LiveController extends AbstractController
             return $this->noStore(new JsonResponse(['error' => 'non_autorise'], Response::HTTP_UNAUTHORIZED));
         }
 
-        if (new \DateTimeImmutable() >= $this->settings->endsAt()) {
+        if (null === $direct || Direct::TERMINE === $direct->phase()) {
             return $this->noStore(new JsonResponse(['error' => 'termine'], Response::HTTP_GONE));
         }
 
-        if (!$this->settings->enabled()) {
+        if (!$direct->accesOuvert) {
             return $this->noStore(new JsonResponse(['error' => 'ferme'], Response::HTTP_LOCKED));
         }
 
@@ -245,11 +253,11 @@ final class LiveController extends AbstractController
     }
 
     /**
-     * Qui est derrière cette session ?
+     * Qui est derrière cette session, pour ce direct ?
      *
      * @return array{super: bool, valid: bool, replaced: bool, code: ?LiveCode, token: ?string}
      */
-    private function viewer(Request $request): array
+    private function viewer(Request $request, ?Direct $direct): array
     {
         $none = ['super' => false, 'valid' => false, 'replaced' => false, 'code' => null, 'token' => null];
         $data = $request->getSession()->get(self::SESSION_KEY);
@@ -264,11 +272,12 @@ final class LiveController extends AbstractController
             return ['super' => $ok] + $none;
         }
 
-        if (!isset($data['code'], $data['token'])) {
+        if (null === $direct || !isset($data['code'], $data['token'])) {
             return $none;
         }
 
-        $code = $this->codes->find((string) $data['code']);
+        // Billet d'un autre direct : inconnu ici
+        $code = $this->codes->find($direct, (string) $data['code']);
 
         if (null === $code || $code->isRevoked()) {
             return $none;
@@ -288,21 +297,6 @@ final class LiveController extends AbstractController
             'code' => $code->getCode(),
             'token' => $this->sessions->claim($code),
         ]);
-    }
-
-    /** "dimanche 22 novembre 2026 à 12h30" (heure du Bénin) */
-    private function label(\DateTimeImmutable $date): string
-    {
-        $local = $date->setTimezone(new \DateTimeZone(LiveSettings::TIMEZONE));
-
-        return sprintf(
-            '%s %d %s %d à %s',
-            self::DAYS[(int) $local->format('w')],
-            (int) $local->format('j'),
-            self::MONTHS[(int) $local->format('n')],
-            (int) $local->format('Y'),
-            $local->format('H\hi'),
-        );
     }
 
     private function noStore(Response $response): Response

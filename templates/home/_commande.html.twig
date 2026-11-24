@@ -2,6 +2,7 @@
    le nombre de places et les coordonnées. Les données partent chez Tick Africa
    (POST /orders), qui renvoie un lien de paiement : formulaire envoyé hors Turbo. #}
 {% set e = commande.errors %}
+{% set plusieurs_titres = seances|map(s => s.titre)|reduce((n, t) => t in n ? n : n|merge([t]), [])|length > 1 %}
 <form
     method="post"
     action="{{ path('app_billetterie_commande') }}#reservation"
@@ -19,7 +20,7 @@
 
     <fieldset class="order__group">
         <legend class="visually-hidden">Choisissez votre séance</legend>
-        <div class="dials">
+        <div class="dials{{ seances|reduce((n, s) => n + max(1, s.tarifs|length), 0) < 3 ? ' dials--few' }}">
             {% for s in seances %}
                 {% set tarifs = s.tarifs|length > 0 ? s.tarifs : [null] %}
                 {% for t in tarifs %}
@@ -39,12 +40,12 @@
                                 {% if actif %}data-price="{{ t.price }}" data-max="{{ t.maxPerOrder }}" data-item="{{ s.article(t)|json_encode }}"{% endif %}
                             >
                             <span class="dial__date">
-                                <span class="dial__weekday">{{ s.jourCourt|split(' ')|first }}</span>
-                                <span class="dial__day">{{ s.startsAt|date('d', 'Africa/Porto-Novo') }}</span>
-                                <span class="dial__month">nov.</span>
+                                <span class="dial__weekday">{{ s.semaineCourte }}</span>
+                                <span class="dial__day">{{ s.startsAt|date('j', 'Africa/Porto-Novo') }}</span>
+                                <span class="dial__month">{{ s.moisCourt }}</span>
                             </span>
-                            <span class="dial__venue"><span class="dial__brand">Majestic</span> {{ s.salle.name|replace({'Majestic ': ''}) }}</span>
-                            <span class="dial__meta">{{ s.heure }}{% if t and s.tarifs|length > 1 %} · {{ t.name }}{% endif %}</span>
+                            <span class="dial__venue">{% if s.salle.name starts with 'Majestic ' %}<span class="dial__brand">Majestic</span> {% endif %}{{ s.salle.name|replace({'Majestic ': ''}) }}</span>
+                            <span class="dial__meta">{% if plusieurs_titres %}{{ s.titre }} · {% endif %}{{ s.heure }}{% if t and s.tarifs|length > 1 %} · {{ t.name }}{% endif %}</span>
                             <span class="dial__foot">
                                 {% if actif %}
                                     <span class="dial__price">{{ t.price|number_format(0, ',', ' ') }}&nbsp;F</span>
@@ -61,8 +62,8 @@
                                 {% endif %}
                             </span>
                         </label>
-                        {% if complet and s.liveAccess %}
-                            <button type="button" class="dial__live" data-open-modal="live-tickets">Suivre le direct&nbsp;→</button>
+                        {% if s.direct and loop.first %}
+                            <button type="button" class="dial__live" data-open-modal="{{ s.direct.fenetre }}">Suivre le direct&nbsp;→</button>
                         {% endif %}
                     </div>
                 {% endfor %}
@@ -135,7 +136,7 @@
             </button>
         </div>
     {% else %}
-        <p class="order__soon">La billetterie des séances du 29 ouvre très bientôt.</p>
+        <p class="order__soon">{{ a_venir ? 'La billetterie ouvre très bientôt.' : 'Aucune séance à venir pour le moment.' }}</p>
     {% endif %}
 
     <p class="order__secure">

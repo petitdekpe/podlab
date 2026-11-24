@@ -3,21 +3,27 @@
 namespace App\Controller;
 
 use App\Billetterie\Billetterie;
+use App\Billetterie\Seance;
+use App\Entity\Direct;
 use App\Live\AdminAuth;
 use App\Live\TickAfricaUnavailable;
 use App\Live\LiveSessions;
 use App\Live\LiveSettings;
 use App\Live\SuperCode;
 use App\Live\TickAfrica;
+use App\Programme\Programme;
 use App\Repository\LiveCodeRepository;
+use App\Site\Affiche;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Espace d'administration du direct (superadmin).
+ * Espace d'administration (superadmin) : connexion, tableau de bord, paramètres, billets.
+ * Évènements et directs : AdminEvenementController et AdminDirectController.
  *
  * L'accès est verrouillé pour toutes les URL /admin/* par AdminAccessListener,
  * sauf la page de connexion.
@@ -25,7 +31,7 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/admin')]
 final class AdminController extends AbstractController
 {
-    private const CSRF_ID = 'admin';
+    use AdminPageTrait;
 
     public function __construct(
         private readonly AdminAuth $auth,
@@ -36,6 +42,8 @@ final class AdminController extends AbstractController
         private readonly LiveSessions $sessions,
         private readonly EntityManagerInterface $em,
         private readonly Billetterie $billetterie,
+        private readonly Affiche $affiche,
+        private readonly Programme $programme,
     ) {
     }
 
@@ -92,23 +100,15 @@ final class AdminController extends AbstractController
     public function dashboard(): Response
     {
         $now = new \DateTimeImmutable();
-        $opens = $this->settings->opensAt();
-        $ends = $this->settings->endsAt();
+        $direct = $this->programme->directActuel($now);
 
         return $this->page($this->render('admin/dashboard.html.twig', [
-            'stats' => $this->repository->stats($now->modify('-90 seconds')),
-            'phase' => match (true) {
-                $now >= $ends => 'termine',
-                $now >= $opens => 'ouvert',
-                default => 'avant',
-            },
-            'enabled' => $this->settings->enabled(),
-            'youtube_ok' => '' !== $this->settings->youtubeId(),
+            'direct' => $direct,
+            'phase' => $direct?->phase($now),
+            'stats' => null === $direct ? null : $this->repository->stats($now->modify('-90 seconds'), $direct),
+            'seances' => array_filter($this->billetterie->seances(), static fn (Seance $s): bool => $s->aVenir()),
             'tickafrica_key' => $this->tickAfrica->isConfigured(),
             'tickafrica_test' => $this->tickAfrica->isTestMode(),
-            'tickafrica_event' => '' !== $this->settings->tickafricaEventId(),
-            'opens_at' => $opens,
-            'ends_at' => $ends,
         ]));
     }
 
@@ -118,19 +118,8 @@ final class AdminController extends AbstractController
     public function settings(Request $request): Response
     {
         $errors = [];
-        $tz = new \DateTimeZone(LiveSettings::TIMEZONE);
 
         $form = [
-            'title' => $this->settings->title(),
-            'youtube' => $this->settings->get('youtube') ?? $this->settings->youtubeId(),
-            'opens_at' => $this->settings->opensAt()->setTimezone($tz)->format('Y-m-d\TH:i'),
-            'ends_at' => $this->settings->endsAt()->setTimezone($tz)->format('Y-m-d\TH:i'),
-            'enabled' => $this->settings->enabled(),
-            'watermark' => $this->settings->watermark(),
-            'soldout' => $this->settings->soldOut(),
-            'live_ticket_url' => (string) $this->settings->get('live_ticket_url'),
-            'tickafrica_event_id' => (string) $this->settings->get('tickafrica_event_id'),
-            'seances' => $this->seanceFields(),
             'return_url' => $this->settings->returnUrl(),
             'analytics_id' => $this->settings->analyticsId(),
         ];
@@ -141,60 +130,12 @@ final class AdminController extends AbstractController
                 $errors[] = 'Session expirée. Réessayez.';
             } else {
                 $form = [
-                    'title' => trim((string) $request->request->get('title')),
-                    'youtube' => trim((string) $request->request->get('youtube')),
-                    'opens_at' => (string) $request->request->get('opens_at'),
-                    'ends_at' => (string) $request->request->get('ends_at'),
-                    'enabled' => $request->request->getBoolean('enabled'),
-                    'watermark' => $request->request->getBoolean('watermark'),
-                    'soldout' => $request->request->getBoolean('soldout'),
-                    'live_ticket_url' => trim((string) $request->request->get('live_ticket_url')),
-                    'tickafrica_event_id' => trim((string) $request->request->get('tickafrica_event_id')),
-                    'seances' => $this->seanceFields($request->request->all('seances')),
                     'return_url' => trim((string) $request->request->get('return_url')),
                     'analytics_id' => trim((string) $request->request->get('analytics_id')),
                 ];
                 // La clé n'est jamais réaffichée : champ vide = on garde celle enregistrée
                 $apiKey = trim((string) $request->request->get('tickafrica_api_key'));
                 $clearKey = $request->request->getBoolean('tickafrica_api_key_clear');
-
-                $opens = $this->parseLocal($form['opens_at'], $tz);
-                $ends = $this->parseLocal($form['ends_at'], $tz);
-
-                if (mb_strlen($form['title']) > 120) {
-                    $errors[] = 'Le titre ne doit pas dépasser 120 caractères.';
-                }
-                if ('' !== $form['youtube'] && '' === LiveSettings::extractVideoId($form['youtube'])) {
-                    $errors[] = 'Le lien ou l\'identifiant YouTube n\'est pas reconnu (attendu : lien youtube.com/watch?v=…, youtu.be/… ou identifiant de 11 caractères).';
-                }
-                if ('' !== $form['live_ticket_url'] && '' === LiveSettings::normalizeEmbedUrl($form['live_ticket_url'])) {
-                    $errors[] = 'Le lien de la billetterie du direct doit être une adresse complète commençant par https://.';
-                }
-                if ('' !== $form['tickafrica_event_id'] && '' === LiveSettings::normalizeUuid($form['tickafrica_event_id'])) {
-                    $errors[] = 'L\'identifiant de l\'événement Tick Africa doit être un UUID (ex. 9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d).';
-                }
-                if (null === $opens || null === $ends) {
-                    $errors[] = 'Les dates d\'ouverture et de fin sont obligatoires.';
-                } elseif ($ends <= $opens) {
-                    $errors[] = 'La fin du direct doit être après son ouverture.';
-                }
-
-                foreach ($form['seances'] as $key => $seance) {
-                    if ('' !== $seance['event'] && '' === LiveSettings::normalizeUuid($seance['event'])) {
-                        $errors[] = sprintf('Séance « %s » : l\'identifiant de l\'événement doit être un UUID.', $seance['label']);
-                    }
-                    if ('' !== $seance['tarifs'] && '' === $seance['event']) {
-                        $errors[] = sprintf('Séance « %s » : indiquez l\'événement avant de restreindre les billets.', $seance['label']);
-                    }
-                    if ('' !== $seance['capacite'] && (!ctype_digit($seance['capacite']) || (int) $seance['capacite'] < 1 || (int) $seance['capacite'] > 100000)) {
-                        $errors[] = sprintf('Séance « %s » : la capacité de la salle doit être un nombre entier de places (ex. 180).', $seance['label']);
-                    }
-                    foreach (array_filter(array_map('trim', explode(',', $seance['tarifs']))) as $tarif) {
-                        if ('' === LiveSettings::normalizeUuid($tarif)) {
-                            $errors[] = sprintf('Séance « %s » : « %s » n\'est pas un identifiant de billet (UUID).', $seance['label'], $tarif);
-                        }
-                    }
-                }
 
                 if ('' !== $form['return_url'] && (!str_starts_with($form['return_url'], 'https://') || false === filter_var($form['return_url'], \FILTER_VALIDATE_URL))) {
                     $errors[] = 'L\'URL de retour après paiement doit être une adresse complète commençant par https://.';
@@ -211,20 +152,7 @@ final class AdminController extends AbstractController
                     }
                 }
 
-                if ([] === $errors && null !== $opens && null !== $ends) {
-                    $this->settings->set('title', '' === $form['title'] ? null : $form['title']);
-                    $this->settings->set('youtube', '' === $form['youtube'] ? null : LiveSettings::extractVideoId($form['youtube']));
-                    $this->settings->set('opens_at', $opens->format('c'));
-                    $this->settings->set('ends_at', $ends->format('c'));
-                    $this->settings->set('enabled', $form['enabled'] ? '1' : '0');
-                    $this->settings->set('watermark', $form['watermark'] ? '1' : '0');
-                    $this->settings->set('soldout', $form['soldout'] ? '1' : '0');
-                    $this->settings->set('live_ticket_url', '' === $form['live_ticket_url'] ? null : $form['live_ticket_url']);
-                    $this->settings->set('tickafrica_event_id', LiveSettings::normalizeUuid($form['tickafrica_event_id']) ?: null);
-                    foreach ($form['seances'] as $key => $seance) {
-                        $this->settings->set('seance_'.$key, self::seanceLink($seance) ?: null);
-                        $this->settings->set('capacite_'.$key, '' === $seance['capacite'] ? null : (string) (int) $seance['capacite']);
-                    }
+                if ([] === $errors) {
                     $this->settings->set('return_url', $form['return_url'] ?: null);
                     $this->settings->set('analytics_id', LiveSettings::normalizeAnalyticsId($form['analytics_id']) ?: null);
                     if ($clearKey) {
@@ -245,21 +173,41 @@ final class AdminController extends AbstractController
         return $this->page($this->render('admin/settings.html.twig', [
             'form' => $form,
             'errors' => $errors,
-            'timezone' => LiveSettings::TIMEZONE,
-            'live_ticket_default' => $this->settings->defaultLiveTicketUrl(),
-            'tickafrica_event_default' => LiveSettings::normalizeUuid($this->settings->tickafricaEventIdDefault()),
+            'affiche' => $this->affiche->personnalisee(),
             'tickafrica_key' => $this->tickAfrica->isConfigured(),
             'tickafrica_test' => $this->tickAfrica->isTestMode(),
             'tickafrica_key_source' => $this->tickAfrica->keySource(),
             'tickafrica_key_masked' => $this->tickAfrica->maskedKey(),
             'tickafrica_key_unreadable' => $this->settings->tickafricaApiKeyUnreadable(),
             'can_store_secrets' => $this->settings->canStoreSecrets(),
-            'tickafrica_events' => $this->tickafricaEvents(),
-            'seances_etat' => $this->billetterie->seances(),
             'derniere_erreur' => $this->lastOrderFailure(),
             'return_url_default' => LiveSettings::defaultReturnUrl($this->generateUrl('app_billetterie_merci', [], \Symfony\Component\Routing\Generator\UrlGeneratorInterface::ABSOLUTE_URL)),
             'diagnostic' => $request->getSession()->get('tickafrica_diagnostic'),
         ]));
+    }
+
+    /** Remplace l'affiche de l'accueil, ou revient à celle d'origine. */
+    #[Route('/affiche', name: 'app_admin_affiche', methods: ['POST'])]
+    public function affiche(Request $request): Response
+    {
+        $envoi = $request->files->get('affiche');
+
+        if (0 === $request->request->count() && (int) $request->server->get('CONTENT_LENGTH') > 0) {
+            // Au-delà de post_max_size, PHP vide tout le formulaire
+            $erreur = 'Image trop lourde pour le serveur. Réduisez-la puis réessayez.';
+        } elseif (!$this->isCsrfTokenValid(self::CSRF_ID, (string) $request->request->get('_token'))) {
+            $erreur = 'Session expirée. Réessayez.';
+        } elseif ($request->request->getBoolean('retablir')) {
+            $erreur = $this->affiche->retablir() ? null : 'L\'affiche n\'a pas pu être retirée (droits d\'écriture sur le dossier var/).';
+        } elseif (!$envoi instanceof UploadedFile) {
+            $erreur = 'Choisissez une image.';
+        } else {
+            $erreur = $this->affiche->remplacer($envoi);
+        }
+
+        null === $erreur ? $this->addFlash('affiche_ok', 'L\'affiche du site est à jour.') : $this->addFlash('affiche_error', $erreur);
+
+        return $this->redirect($this->generateUrl('app_admin_settings').'#affiche');
     }
 
     /** Vérifie les autorisations de la clé auprès de Tick Africa (rien n'est créé ni consommé). */
@@ -292,47 +240,6 @@ final class AdminController extends AbstractController
     }
 
     /**
-     * Champs « séances » du formulaire : saisie en cours, sinon valeurs enregistrées.
-     *
-     * @param array<string, mixed>|null $posted
-     *
-     * @return array<string, array{label: string, event: string, tarifs: string, capacite: string, default: string}>
-     */
-    private function seanceFields(?array $posted = null): array
-    {
-        $labels = ['marina-22' => 'Dim. 22 nov. · Majestic Marina', 'marina-28' => 'Dim. 29 nov. · Majestic Marina', 'wologuede-28' => 'Dim. 29 nov. · Majestic Wologuèdè'];
-        $defaults = $this->billetterie->defaultLinks();
-        $fields = [];
-
-        foreach (LiveSettings::SEANCES as $key) {
-            if (null !== $posted) {
-                $event = trim((string) ($posted[$key]['event'] ?? ''));
-                $tarifs = trim((string) ($posted[$key]['tarifs'] ?? ''));
-                $capacite = preg_replace('/\s+/', '', (string) ($posted[$key]['capacite'] ?? '')) ?? '';
-            } else {
-                [$event, $ids] = Billetterie::parseLink($this->settings->seanceLink($key));
-                $tarifs = implode(', ', $ids);
-                $capacite = (string) ($this->settings->seanceCapacity($key) ?? '');
-            }
-            $fields[$key] = ['label' => $labels[$key], 'event' => $event, 'tarifs' => $tarifs, 'capacite' => $capacite, 'default' => $defaults[$key] ?? ''];
-        }
-
-        return $fields;
-    }
-
-    /** @param array{event: string, tarifs: string} $seance */
-    private static function seanceLink(array $seance): string
-    {
-        $event = LiveSettings::normalizeUuid($seance['event']);
-        if ('' === $event) {
-            return '';
-        }
-        $tarifs = array_filter(array_map(static fn (string $t): string => LiveSettings::normalizeUuid($t), explode(',', $seance['tarifs'])));
-
-        return [] === $tarifs ? $event : $event.':'.implode(',', $tarifs);
-    }
-
-    /**
      * Vérifie une nouvelle clé auprès de Tick Africa avant de l'enregistrer.
      *
      * @param list<string> $warnings avertissements (la clé est tout de même enregistrée)
@@ -362,28 +269,6 @@ final class AdminController extends AbstractController
         return null;
     }
 
-    /**
-     * Événements Tick Africa de la clé, pour proposer leurs identifiants dans le formulaire.
-     *
-     * @return list<array{id: string, label: string}>
-     */
-    private function tickafricaEvents(): array
-    {
-        if (!$this->tickAfrica->isConfigured()) {
-            return [];
-        }
-        try {
-            $events = $this->tickAfrica->events();
-        } catch (TickAfricaUnavailable) {
-            return [];
-        }
-
-        return array_values(array_filter(array_map(static fn (array $e): array => [
-            'id' => (string) ($e['id'] ?? ''),
-            'label' => trim(sprintf('%s · %s', $e['name'] ?? '', substr((string) ($e['starts_at'] ?? ''), 0, 16))),
-        ], $events), static fn (array $e): bool => '' !== $e['id']));
-    }
-
     /** Remplace le supercode (l'ancien cesse de fonctionner immédiatement). */
     #[Route('/supercode', name: 'app_admin_supercode', methods: ['POST'])]
     public function rotateSuperCode(Request $request): Response
@@ -407,7 +292,8 @@ final class AdminController extends AbstractController
         $status = \in_array($status, ['all', 'used', 'revoked'], true) ? $status : 'all';
         $page = max(1, $request->query->getInt('page', 1));
 
-        $result = $this->repository->search($q, $status, $page);
+        $direct = $this->direct($request);
+        $result = $this->repository->search($q, $status, $page, $direct);
 
         return $this->page($this->render('admin/codes.html.twig', [
             'items' => $result['items'],
@@ -416,17 +302,20 @@ final class AdminController extends AbstractController
             'page' => min($page, $result['pages']),
             'q' => $q,
             'status' => $status,
+            'direct' => $direct,
+            'directs' => $this->programme->tousDirects(),
             'back' => $request->getRequestUri(),
         ]));
     }
 
     #[Route('/codes/export.csv', name: 'app_admin_codes_export', methods: ['GET'])]
-    public function export(): Response
+    public function export(Request $request): Response
     {
-        $lines = ["numero;code;libelle;statut;premiere_connexion"];
-        foreach ($this->repository->allOrdered() as $i => $code) {
+        $lines = ["numero;direct;code;libelle;statut;premiere_connexion"];
+        foreach ($this->repository->allOrdered($this->direct($request)) as $i => $code) {
             $lines[] = implode(';', [
                 $i + 1,
+                $this->csvCell((string) $code->getDirect()?->titre),
                 $this->csvCell($code->getCode()),
                 $this->csvCell((string) $code->getLabel()),
                 $code->isRevoked() ? 'révoqué' : 'actif',
@@ -483,11 +372,12 @@ final class AdminController extends AbstractController
 
     // ---------------------------------------------------------------------
 
-    private function parseLocal(string $value, \DateTimeZone $tz): ?\DateTimeImmutable
+    /** Direct choisi dans la liste (?direct=…), ou null : tous. */
+    private function direct(Request $request): ?Direct
     {
-        $date = \DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $value, $tz);
+        $id = $request->query->getInt('direct');
 
-        return false === $date ? null : $date;
+        return $id > 0 ? $this->em->find(Direct::class, $id) : null;
     }
 
     /** Neutralise les formules (=, +, -, @) pour les tableurs. */
@@ -506,14 +396,5 @@ final class AdminController extends AbstractController
         return str_starts_with($back, '/admin/codes') && !str_contains($back, '//')
             ? $this->redirect($back)
             : $this->redirectToRoute('app_admin_codes');
-    }
-
-    private function page(Response $response): Response
-    {
-        $response->setPrivate();
-        $response->headers->addCacheControlDirective('no-store');
-        $response->headers->set('X-Robots-Tag', 'noindex, nofollow');
-
-        return $response;
     }
 }

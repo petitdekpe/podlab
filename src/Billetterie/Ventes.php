@@ -2,14 +2,16 @@
 
 namespace App\Billetterie;
 
-use App\Live\LiveSettings;
+use App\Entity\Evenement;
 use App\Live\TickAfrica;
 use App\Live\TickAfricaUnavailable;
+use App\Programme\Programme;
+use App\Site\DateFr;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Bilan des ventes des séances du 29 novembre, pour la page /ventes.
+ * Bilan des ventes des évènements suivis (case « bilan » dans /admin), pour la page /ventes.
  *
  * Deux notions à ne pas confondre, chacune avec son pourcentage :
  * - tickets MIS EN VENTE (stock chez Tick Africa) : ventes = vendus ÷ mis en vente ;
@@ -23,11 +25,7 @@ use Psr\Log\LoggerInterface;
  */
 final class Ventes
 {
-    /** Les deux dernières séances : dimanche 29 novembre */
-    public const SEANCES = ['marina-28', 'wologuede-28'];
-
-    public const TIMEZONE = 'Africa/Porto-Novo';
-    private const CACHE_KEY = 'ventes.rapport.v2';
+    private const CACHE_KEY = 'ventes.rapport.v3.';
     private const TTL = 60;
     private const PER_PAGE = 100;
     private const MAX_PAGES = 50;
@@ -40,10 +38,9 @@ final class Ventes
 
     public function __construct(
         private readonly TickAfrica $tickAfrica,
-        private readonly Billetterie $billetterie,
+        private readonly Programme $programme,
         private readonly CacheItemPoolInterface $cache,
         private readonly LoggerInterface $logger,
-        private readonly LiveSettings $settings,
     ) {
     }
 
@@ -52,7 +49,8 @@ final class Ventes
      */
     public function rapport(bool $actualiser = false): array
     {
-        $item = $this->cache->getItem(self::CACHE_KEY);
+        // Un changement dans /admin (évènement, lien, capacité…) donne un nouveau bilan
+        $item = $this->cache->getItem(self::CACHE_KEY.md5(serialize(array_map(static fn (Evenement $e): Evenement => $e->releve(), $this->evenements()))));
         if (!$actualiser && $item->isHit()) {
             return $item->get();
         }
@@ -63,26 +61,32 @@ final class Ventes
         return $rapport;
     }
 
+    /** @return list<Evenement> évènements suivis, masqués ou non sur le site */
+    public function evenements(): array
+    {
+        return array_values(array_filter($this->programme->tousEvenements(), static fn (Evenement $e): bool => $e->bilan));
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function calculer(\DateTimeImmutable $now): array
     {
-        $tz = new \DateTimeZone(self::TIMEZONE);
-        $seances = $this->billetterie->seances();
-        $liens = $this->billetterie->links();
+        $tz = DateFr::zone();
         $configure = $this->tickAfrica->isConfigured();
 
         // 1. Billets de chaque séance (GET /events/{id})
         $lignes = [];
         $champsProduit = [];
-        foreach (self::SEANCES as $key) {
-            $seance = $seances[$key] ?? null;
-            [$eventId, $productIds] = Billetterie::parseLink($liens[$key] ?? '');
+        foreach ($this->evenements() as $evenement) {
+            $key = $evenement->getCle();
+            $eventId = $evenement->tickafricaEventId;
             $ligne = [
                 'key' => $key,
-                'salle' => $seance?->salle['name'] ?? $key,
-                'starts_at' => $seance?->startsAt->format('c'),
+                'salle' => $evenement->salle()['name'],
+                'quand' => DateFr::jourCourt($evenement->debut()).' · '.DateFr::heure($evenement->debut()),
+                'capacite' => $evenement->places(),
+                'starts_at' => $evenement->debut()->format('c'),
                 'event_id' => $eventId,
                 'erreur' => null,
                 'produits' => [],
@@ -91,11 +95,11 @@ final class Ventes
             if (!$configure) {
                 $ligne['erreur'] = 'Aucune clé API Tick Africa.';
             } elseif ('' === $eventId) {
-                $ligne['erreur'] = 'Séance non reliée à un événement Tick Africa (/admin › Paramètres).';
+                $ligne['erreur'] = 'Séance non reliée à un événement Tick Africa (/admin › Évènements).';
             } else {
                 try {
                     $event = $this->tickAfrica->event($eventId);
-                    $ligne['produits'] = self::produits($event, $productIds);
+                    $ligne['produits'] = self::produits($event, $evenement->tarifs());
                     foreach ($ligne['produits'] as $p) {
                         $champsProduit += array_flip(array_keys($p));
                     }
@@ -133,7 +137,7 @@ final class Ventes
         }
 
         // 3. Attribution des commandes aux séances
-        $parSeance = array_fill_keys(self::SEANCES, []);
+        $parSeance = array_fill_keys(array_keys($lignes), []);
         $partageEvent = array_count_values(array_filter(array_column($lignes, 'event_id')));
         foreach ($commandes as $commande) {
             if (!\in_array(strtolower((string) ($commande['status'] ?? '')), self::PAYEES, true)) {
@@ -268,17 +272,18 @@ final class Ventes
             }
         }
 
-        $debut = null !== $ligne['starts_at'] ? new \DateTimeImmutable($ligne['starts_at']) : null;
+        $debut = new \DateTimeImmutable($ligne['starts_at']);
 
         return [
             'salle' => $ligne['salle'],
+            'quand' => $ligne['quand'],
             'erreur' => $ligne['erreur'],
             'source' => $source,
             'recette' => $recetteReelle ? (int) round($recetteCommandes) : self::somme($tarifs, 'valeur'),
             'recette_reelle' => $recetteReelle,
             'h24' => $h24,
-            'jours_restants' => null !== $debut && $debut > $now ? ($debut->getTimestamp() - $now->getTimestamp()) / 86400 : 0.0,
-        ] + self::taux($vendus, self::somme($tarifs, 'mis_en_vente'), $this->capaciteSalle($ligne['key']));
+            'jours_restants' => $debut > $now ? ($debut->getTimestamp() - $now->getTimestamp()) / 86400 : 0.0,
+        ] + self::taux($vendus, self::somme($tarifs, 'mis_en_vente'), $ligne['capacite']);
     }
 
     /**
@@ -307,16 +312,6 @@ final class Ventes
         $valeurs = array_column($lignes, $champ);
 
         return [] === $valeurs || \in_array(null, $valeurs, true) ? null : (int) array_sum($valeurs);
-    }
-
-    /** Capacité de la salle saisie dans /admin ; null si absente ou base injoignable. */
-    private function capaciteSalle(string $seance): ?int
-    {
-        try {
-            return $this->settings->seanceCapacity($seance);
-        } catch (\Throwable) {
-            return null;
-        }
     }
 
     /**

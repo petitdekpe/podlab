@@ -1,0 +1,79 @@
+{% extends 'admin/layout.html.twig' %}
+{% set active = 'directs' %}
+{% set titre_page = direct.id ? 'Configurer le direct' : 'Ajouter un direct' %}
+
+{% block admin_title %}{{ titre_page }}{% endblock %}
+
+{% block admin_content %}
+    <div class="adm-head">
+        <h1 class="adm-h1">{{ titre_page }}</h1>
+        <a class="adm-btn" href="{{ path('app_admin_directs') }}">← Directs</a>
+    </div>
+
+    {% for erreur in erreurs %}
+        <p class="adm-alert adm-alert--error" role="alert">{{ erreur }}</p>
+    {% endfor %}
+
+    <form method="post" class="adm-card adm-form adm-form--wide">
+        <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+
+        <label class="adm-label" for="titre">Titre affiché sur la page du direct</label>
+        <input id="titre" name="titre" type="text" class="adm-input" maxlength="120" value="{{ form.titre }}">
+
+        <label class="adm-label" for="evenement">Séance diffusée</label>
+        <select id="evenement" name="evenement" class="adm-input">
+            <option value="">Aucune (direct seul)</option>
+            {% for e in evenements %}<option value="{{ e.id }}"{{ form.evenement == e.id ~ '' ? ' selected' }}>{{ e.libelle }}{{ e.publie ? '' : ' (masquée)' }}</option>{% endfor %}
+        </select>
+        <p class="adm-help">Le site propose alors le direct sur cette séance, aux dates et horaires de la séance.</p>
+
+        <label class="adm-label" for="youtube">Vidéo YouTube</label>
+        <input id="youtube" name="youtube" type="text" class="adm-input" value="{{ form.youtube }}" placeholder="https://www.youtube.com/watch?v=… ou identifiant" autocomplete="off" spellcheck="false">
+        <p class="adm-help">Vidéo « non répertoriée », intégration autorisée, <strong>option DVR désactivée</strong> dans YouTube Studio (sinon les spectateurs peuvent reculer). Jamais visible dans le code de la page : elle n'est fournie qu'aux billets valides.</p>
+
+        <div class="adm-row">
+            <div>
+                <label class="adm-label" for="ouverture">Ouverture</label>
+                <input id="ouverture" name="ouverture" type="datetime-local" class="adm-input" value="{{ form.ouverture }}" required>
+            </div>
+            <div>
+                <label class="adm-label" for="fin">Fin</label>
+                <input id="fin" name="fin" type="datetime-local" class="adm-input" value="{{ form.fin }}" required>
+            </div>
+        </div>
+        <p class="adm-help">Heure du Bénin. Avant l'ouverture, les spectateurs voient un décompte. Après la fin, la vidéo est retirée.</p>
+
+        <h2 class="adm-h2 adm-h2--section">Billets du direct</h2>
+        <datalist id="tickafrica-events">
+            {% for event in tickafrica_events %}<option value="{{ event.id }}">{{ event.label }}</option>{% endfor %}
+        </datalist>
+
+        <label class="adm-label" for="event">Événement Tick Africa « accès au direct »</label>
+        <input id="event" name="event" type="text" class="adm-input" list="tickafrica-events" value="{{ form.event }}" placeholder="9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d" autocomplete="off" spellcheck="false">
+        <p class="adm-help">
+            UUID de l'événement dont les billets ouvrent ce direct. Les billets d'un autre événement (la salle, un autre direct) sont refusés et ne sont pas consommés.
+            {% if tickafrica_events %}Cliquez dans le champ pour choisir parmi vos événements.{% endif %}
+            Tant qu'il est vide, aucun nouveau billet n'est accepté.
+        </p>
+
+        <label class="adm-label" for="billetterie">Lien d'achat (Tick Africa)</label>
+        <input id="billetterie" name="billetterie" type="url" class="adm-input" maxlength="500" value="{{ form.billetterie }}" placeholder="https://tick.africa/embed/…" autocomplete="off" spellcheck="false">
+        <p class="adm-help">Lien d'intégration (embed) affiché dans la fenêtre d'achat du site. Tant qu'il est vide, la fenêtre indique que la billetterie ouvre bientôt.</p>
+
+        <h2 class="adm-h2 adm-h2--section">Affichage et accès</h2>
+        <label class="adm-check">
+            <input type="checkbox" name="publie" value="1"{{ form.publie ? ' checked' }}>
+            <span><strong>Affiché sur le site</strong><br><span class="adm-muted">Décochez pour préparer le direct sans l'annoncer. Deux directs affichés ne peuvent pas se chevaucher.</span></span>
+        </label>
+        <label class="adm-check">
+            <input type="checkbox" name="accesOuvert" value="1"{{ form.accesOuvert ? ' checked' }}>
+            <span><strong>Accès ouvert</strong><br><span class="adm-muted">Décochez pour fermer l'accès à tous les billets d'un coup (le supercode reste valable).</span></span>
+        </label>
+        <label class="adm-check">
+            <input type="checkbox" name="filigrane" value="1"{{ form.filigrane ? ' checked' }}>
+            <span><strong>Filigrane avec le numéro du billet</strong><br><span class="adm-muted">Un texte discret se déplace sur la vidéo : il permet de retrouver l'origine d'un enregistrement partagé.</span></span>
+        </label>
+
+        <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary">Enregistrer</button></p>
+    </form>
+{% endblock %}

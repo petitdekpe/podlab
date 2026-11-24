@@ -1,0 +1,71 @@
+{% extends 'admin/layout.html.twig' %}
+{% set active = 'evenements' %}
+
+{% block admin_title %}Évènements{% endblock %}
+
+{% macro liste(lignes) %}
+    <div class="adm-tablewrap">
+        <table class="adm-table">
+            <thead>
+                <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Évènement</th>
+                    <th scope="col">Billetterie</th>
+                    <th scope="col">Site</th>
+                    <th scope="col"><span class="adm-sr">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for l in lignes %}
+                    {% set e = l.e %}
+                    <tr class="{{ e.publie ? '' : 'is-revoked' }}">
+                        <td data-label="Date"><strong>{{ l.etat.jourCourt }}</strong> {{ e.debut|date('Y', 'Africa/Porto-Novo') }}<br><span class="adm-muted">{{ e.horaire }}</span></td>
+                        <td data-label="Évènement">{% if e.id %}<a href="{{ path('app_admin_evenement', {id: e.id}) }}">{{ e.titre }}</a>{% else %}{{ e.titre }}{% endif %}<br><span class="adm-muted">{{ e.lieu ? e.lieu.nom }}</span></td>
+                        <td data-label="Billetterie">
+                            <span class="adm-tag{{ l.etat.onSale ? ' adm-tag--ok' }}{{ l.etat.soldOut ? ' adm-tag--bad' }}">{{ constant('App\\Billetterie\\Seance::ETATS')[l.etat.status] }}</span>
+                            {% if l.etat.onSale and l.etat.placesRestantes is not null %}<br><span class="adm-muted">{{ l.etat.placesRestantes }} place{{ l.etat.placesRestantes > 1 ? 's' }}</span>{% endif %}
+                        </td>
+                        <td data-label="Site"><span class="adm-tag{{ e.publie ? ' adm-tag--ok' }}">{{ e.publie ? 'Affiché' : 'Masqué' }}</span></td>
+                        <td><div class="adm-cell-actions">
+                            {% if e.id %}
+                                <a class="adm-btn adm-btn--small" href="{{ path('app_admin_evenement', {id: e.id}) }}">Modifier</a>
+                                <a class="adm-btn adm-btn--small" href="{{ path('app_admin_evenement_nouveau', {copie: e.id}) }}">Dupliquer</a>
+                                <form method="post" action="{{ path('app_admin_evenement_publier', {id: e.id}) }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                                    <button type="submit" class="adm-btn adm-btn--small">{{ e.publie ? 'Masquer' : 'Afficher' }}</button>
+                                </form>
+                                <form method="post" action="{{ path('app_admin_evenement_supprimer', {id: e.id}) }}" onsubmit="return confirm('Supprimer définitivement cet évènement ? Pour le retirer du site en le gardant ici, utilisez plutôt « Masquer ».');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                                    <button type="submit" class="adm-btn adm-btn--small adm-btn--danger">Supprimer</button>
+                                </form>
+                            {% endif %}
+                        </div></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5" class="adm-empty">Aucun évènement.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endmacro %}
+
+{% block admin_content %}
+    {% import _self as m %}
+    <div class="adm-head">
+        <h1 class="adm-h1">Évènements</h1>
+        <a class="adm-btn adm-btn--primary" href="{{ path('app_admin_evenement_nouveau') }}">Ajouter un évènement</a>
+    </div>
+
+    {% if hors_base %}
+        <p class="adm-alert adm-alert--error" role="alert">Les évènements ne peuvent pas être lus en base : ceux affichés ici sont le dernier relevé connu et ne sont pas modifiables. Vérifiez la base de données et lancez <code>php bin/console doctrine:migrations:migrate</code>.</p>
+    {% endif %}
+
+    <h2 class="adm-h2">À venir</h2>
+    {{ m.liste(a_venir) }}
+
+    {% if passes %}
+        <h2 class="adm-h2">Passés</h2>
+        <p class="adm-muted">Un évènement passé reste affiché sur le site tant qu'il n'est pas masqué.</p>
+        {{ m.liste(passes) }}
+    {% endif %}
+{% endblock %}

@@ -38,8 +38,12 @@
             {% endif %}
 
             {% if seance %}
-                <p class="thanks__seance">{{ seance.jour }} · {{ seance.heure }} · {{ seance.salle.name }}<br><span>{{ seance.salle.sub }}, {{ seance.salle.address }}</span></p>
-                <p class="live__panel-text">Ouverture des portes à 12h30, fermeture à 12h55&nbsp;: aucune entrée après, même avec un billet.</p>
+                <p class="thanks__seance">{{ seance.jour }} · {{ seance.heure }} · {{ seance.salle.name }}<br><span>{{ [seance.salle.sub, seance.salle.address]|filter(v => v)|join(', ') }}</span></p>
+                {% set portes = seance.evenement.portes %}
+                {% set fermeture = seance.evenement.fermeture %}
+                {% if portes or fermeture %}
+                    <p class="live__panel-text">{{ portes ? 'Ouverture des portes à ' ~ portes }}{{ portes and fermeture ? ', fermeture à ' : (fermeture ? 'Fermeture des portes à ') }}{{ fermeture }}{{ fermeture ? ' : aucune entrée après, même avec un billet' }}.</p>
+                {% endif %}
             {% endif %}
 
             <a href="{{ path('app_home') }}{{ statut in ['cancelled', 'refunded'] ? '#reservation' }}" data-turbo="false" class="btn btn--primary">

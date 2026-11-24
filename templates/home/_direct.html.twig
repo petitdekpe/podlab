@@ -1,0 +1,125 @@
+{# Pop-up d'un direct : annonce, trois étapes de validation, puis achat. Variables :
+   d (App\Entity\Direct), seance (App\Billetterie\Seance de la séance diffusée, ou null),
+   en_vente et dates_en_vente (séances en salle).
+   S'ouvre à chaque clic sur un bouton data-open-modal="{{ d.fenetre }}".
+   Parcours : annonce → 1. principe → 2. règles → 3. engagement → achat (formulaire Tickafrica). #}
+{% set complete = seance and seance.soldOut %}
+{% set quand = d.jour|lower ~ ' ' ~ d.debutAffiche|date('Y', 'Africa/Porto-Novo') %}
+<dialog
+    class="modal"
+    data-controller="modal steps"
+    data-modal-id-value="{{ d.fenetre }}"
+    data-modal-auto-open-value="false"
+    data-steps-storage-key-value="live-purchase-steps-{{ d.id }}"
+    data-action="click->modal#backdrop close->modal#closed close->steps#reset change->steps#sync"
+    aria-labelledby="{{ d.fenetre }}-title"
+>
+    <div class="modal__box">
+        <button type="button" class="modal__close" data-action="modal#close" aria-label="Fermer la fenêtre">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+
+        {# ===== Annonce ===== #}
+        <section class="step" data-steps-target="panel">
+            {% if complete %}<p class="modal__badge">Sold out</p>{% endif %}
+            <p class="eyebrow">{{ d.jour }}{% if seance %} · {{ seance.salle.name }}{% endif %}</p>
+            <h2 id="{{ d.fenetre }}-title" class="modal__title" tabindex="-1">{{ complete ? 'La séance du ' ~ d.date ~ ' est complète' : 'Suivez le direct du ' ~ d.date }}</h2>
+            <p class="modal__text">
+                {{ complete ? 'Mais vous pouvez la vivre' : 'Vivez-le' }} en direct, depuis chez vous&nbsp;: {% if d.billetterie %}<strong>l'accès au direct est en vente</strong>, {% endif %}le {{ quand }}, <strong>{{ seance ? 'aux mêmes heures que la projection (' ~ d.horaire ~ ', heure du Bénin)' : d.horaire ~ ' (heure du Bénin)' }}</strong>.
+            </p>
+            <p class="modal__text">Avant d'acheter, prenez une minute pour comprendre comment fonctionne le direct&nbsp;: trois courtes étapes.</p>
+            {% if en_vente %}
+                <p class="modal__text">Vous préférez la salle&nbsp;? <a href="#reservation" data-action="modal#close">Il reste des places le {{ dates_en_vente }}</a>.</p>
+            {% endif %}
+            <div class="step__actions">
+                <button type="button" class="btn btn--primary" data-action="steps#start">Acheter un accès au direct</button>
+                <button type="button" class="btn btn--quiet" data-action="modal#close">Plus tard</button>
+            </div>
+        </section>
+
+        {# ===== Étape 1 : le principe ===== #}
+        <section class="step" data-steps-target="panel" hidden>
+            <p class="step__count">Étape 1 sur 3 <span class="step__bar" aria-hidden="true"><i class="is-on"></i><i></i><i></i></span></p>
+            <h2 class="modal__title" tabindex="-1">Le principe&nbsp;: un direct, à heure fixe</h2>
+            <ol class="timeline">
+                <li class="timeline__item">
+                    <p class="timeline__when">Avant le direct</p>
+                    <p class="timeline__what">Il n'y a rien à voir. Si vous arrivez avant l'heure, un décompte vous attend.</p>
+                </li>
+                <li class="timeline__item timeline__item--live">
+                    <p class="timeline__when">Pendant le direct · {{ d.horaire }}</p>
+                    <p class="timeline__what">Vous rejoignez le direct <strong>là où nous en sommes</strong>. Ce qui s'est passé avant votre arrivée, vous ne le rattrapez pas.</p>
+                </li>
+                <li class="timeline__item">
+                    <p class="timeline__when">Après le direct</p>
+                    <p class="timeline__what"><strong>C'est fini.</strong> Il n'y a ni rediffusion ni replay : la page ne donne plus accès à la vidéo.</p>
+                </li>
+            </ol>
+            <div class="step__actions">
+                <button type="button" class="btn btn--quiet" data-action="steps#back">Retour</button>
+                <button type="button" class="btn btn--primary" data-action="steps#next">Continuer</button>
+            </div>
+        </section>
+
+        {# ===== Étape 2 : les règles ===== #}
+        <section class="step" data-steps-target="panel" hidden>
+            <p class="step__count">Étape 2 sur 3 <span class="step__bar" aria-hidden="true"><i class="is-on"></i><i class="is-on"></i><i></i></span></p>
+            <h2 class="modal__title" tabindex="-1">Les règles du direct</h2>
+            <ul class="bullets step__list">
+                <li><strong>Pas de pause, pas de retour en arrière.</strong> Le lecteur ne propose que le volume et le plein écran.</li>
+                <li><strong>Pas de rediffusion.</strong> Une fois le direct terminé, la vidéo n'est plus accessible.</li>
+                <li><strong>Un code, un appareil à la fois.</strong> Si vous vous connectez ailleurs avec le même code, le premier appareil est déconnecté.</li>
+                <li><strong>Prévoyez une bonne connexion</strong> (Wi-Fi ou 4G). Si elle coupe, vous reprenez le direct là où il en est.</li>
+                <li>Votre code d'accès vous est envoyé avec votre billet. Le jour J, saisissez-le sur la page du direct.</li>
+            </ul>
+            <div class="step__actions">
+                <button type="button" class="btn btn--quiet" data-action="steps#back">Retour</button>
+                <button type="button" class="btn btn--primary" data-action="steps#next">Continuer</button>
+            </div>
+        </section>
+
+        {# ===== Étape 3 : avertissement ===== #}
+        <section class="step" data-steps-target="panel" hidden>
+            <p class="step__count">Étape 3 sur 3 <span class="step__bar" aria-hidden="true"><i class="is-on"></i><i class="is-on"></i><i class="is-on"></i></span></p>
+            <h2 class="modal__title" tabindex="-1">Avertissement&nbsp;: ce direct est protégé</h2>
+            <div class="step__warning" role="note">
+                <p><strong>Toute capture d'écran, tout enregistrement, toute copie ou diffusion du direct est strictement interdit</strong>, en tout ou en partie, y compris sur les réseaux sociaux ou les messageries.</p>
+                {% if d.filigrane %}<p>Chaque accès est identifié&nbsp;: le numéro de votre billet s'affiche sur la vidéo. Toute fuite peut être retracée jusqu'à votre billet.</p>{% endif %}
+                <p><strong>Toute personne qui enregistre ou diffuse le direct s'expose à des poursuites judiciaires.</strong></p>
+            </div>
+            <label class="step__check">
+                <input type="checkbox" data-steps-target="check">
+                <span>J'ai compris le principe et les règles du direct (avant, rien&nbsp;; pendant, je rejoins là où ils en sont&nbsp;; après, c'est fini). Je m'engage à ne pas capturer, enregistrer ni diffuser le direct, et je suis conscient(e) des poursuites judiciaires encourues.</span>
+            </label>
+            <div class="step__actions">
+                <button type="button" class="btn btn--quiet" data-action="steps#back">Retour</button>
+                <button type="button" class="btn btn--primary" data-steps-target="next" data-action="steps#next" disabled>Valider et passer à l'achat</button>
+            </div>
+        </section>
+
+        {# ===== Achat ===== #}
+        <section class="step" data-steps-target="panel" hidden>
+            <p class="eyebrow">Paiement · {{ d.jour|lower }}, {{ d.horaire }}</p>
+            <h2 class="modal__title modal__title--compact" tabindex="-1">Achetez votre accès au direct</h2>
+
+            {% if d.billetterie %}
+                <div class="modal__embed" data-controller="tickafrica">
+                    <iframe
+                        data-lazy-src="{{ d.billetterie }}"
+                        title="Billetterie des accès au direct"
+                        class="modal__iframe"
+                        height="120"
+                        data-tickafrica-target="frame"
+                    ></iframe>
+                </div>
+                <p class="modal__note">Votre code d'accès au direct vous est envoyé avec votre billet. Le jour J, saisissez-le sur <a href="{{ path('app_live') }}">la page du direct</a> : un code ne fonctionne que sur un appareil à la fois.</p>
+            {% else %}
+                <p class="modal__soon">La billetterie des accès au direct ouvre très bientôt. Revenez sur cette page ou suivez Podlab et Bénin Bouge pour l'annonce.</p>
+            {% endif %}
+
+            <div class="step__actions">
+                <button type="button" class="btn btn--quiet" data-action="steps#back">Relire les règles</button>
+            </div>
+        </section>
+    </div>
+</dialog>

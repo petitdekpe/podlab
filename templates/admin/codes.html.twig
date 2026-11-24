@@ -17,10 +17,15 @@
                 <option value="used"{{ status == 'used' ? ' selected' }}>Actifs</option>
                 <option value="revoked"{{ status == 'revoked' ? ' selected' }}>Révoqués</option>
             </select>
+            <label class="adm-sr" for="direct">Direct</label>
+            <select id="direct" name="direct" class="adm-input">
+                <option value="">Tous les directs</option>
+                {% for d in directs|reverse %}<option value="{{ d.id }}"{{ direct and direct.id == d.id ? ' selected' }}>{{ d.titre }} · {{ d.ouverture|date('d/m/Y', 'Africa/Porto-Novo') }}</option>{% endfor %}
+            </select>
             <button type="submit" class="adm-btn">Filtrer</button>
         </form>
 
-        <a class="adm-btn" href="{{ path('app_admin_codes_export') }}">Exporter (CSV)</a>
+        <a class="adm-btn" href="{{ path('app_admin_codes_export', direct ? {direct: direct.id} : {}) }}">Exporter (CSV)</a>
     </section>
 
     <div class="adm-tablewrap">
@@ -38,7 +43,7 @@
             <tbody>
                 {% for code in items %}
                     <tr class="{{ code.revoked ? 'is-revoked' }}">
-                        <td data-label="Code"><code class="adm-code">{{ code.code }}</code></td>
+                        <td data-label="Code"><code class="adm-code">{{ code.code }}</code>{% if not direct and directs|length > 1 and code.direct %}<br><span class="adm-muted">{{ code.direct.titre }} · {{ code.direct.ouverture|date('d/m', 'Africa/Porto-Novo') }}</span>{% endif %}</td>
                         <td data-label="Porteur · billet">
                             <form method="post" action="{{ path('app_admin_code_label', {id: code.id}) }}" class="adm-inline">
                                 <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
@@ -79,9 +84,9 @@
 
     {% if pages > 1 %}
         <nav class="adm-pager" aria-label="Pagination">
-            {% if page > 1 %}<a class="adm-btn adm-btn--small" href="{{ path('app_admin_codes', {q: q, statut: status, page: page - 1}) }}">← Précédent</a>{% endif %}
+            {% if page > 1 %}<a class="adm-btn adm-btn--small" href="{{ path('app_admin_codes', {q: q, statut: status, direct: direct ? direct.id : null, page: page - 1}) }}">← Précédent</a>{% endif %}
             <span class="adm-muted">Page {{ page }} / {{ pages }}</span>
-            {% if page < pages %}<a class="adm-btn adm-btn--small" href="{{ path('app_admin_codes', {q: q, statut: status, page: page + 1}) }}">Suivant →</a>{% endif %}
+            {% if page < pages %}<a class="adm-btn adm-btn--small" href="{{ path('app_admin_codes', {q: q, statut: status, direct: direct ? direct.id : null, page: page + 1}) }}">Suivant →</a>{% endif %}
         </nav>
     {% endif %}
 {% endblock %}

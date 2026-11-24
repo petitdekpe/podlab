@@ -11,10 +11,13 @@
         <div class="adm-top__in">
             <a href="{{ path('app_admin') }}" class="adm-brand">
                 <img src="{{ asset('images/logo-podlab.jpg') }}" alt="" class="adm-brand__logo">
-                <span>Administration du direct</span>
+                <span>Administration</span>
             </a>
             <nav class="adm-nav" aria-label="Administration">
                 <a href="{{ path('app_admin') }}" class="adm-nav__link{{ active|default('') == 'dashboard' ? ' is-active' }}">Tableau de bord</a>
+                <a href="{{ path('app_admin_evenements') }}" class="adm-nav__link{{ active|default('') == 'evenements' ? ' is-active' }}">Évènements</a>
+                <a href="{{ path('app_admin_lieux') }}" class="adm-nav__link{{ active|default('') == 'lieux' ? ' is-active' }}">Lieux</a>
+                <a href="{{ path('app_admin_directs') }}" class="adm-nav__link{{ active|default('') == 'directs' ? ' is-active' }}">Directs</a>
                 <a href="{{ path('app_admin_codes') }}" class="adm-nav__link{{ active|default('') == 'codes' ? ' is-active' }}">Billets</a>
                 <a href="{{ path('app_admin_settings') }}" class="adm-nav__link{{ active|default('') == 'settings' ? ' is-active' }}">Paramètres</a>
                 <a href="{{ path('app_live') }}" class="adm-nav__link" target="_blank" rel="noopener">Page du direct ↗</a>

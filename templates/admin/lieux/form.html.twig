@@ -1,0 +1,76 @@
+{% extends 'admin/layout.html.twig' %}
+{% set active = 'lieux' %}
+{% set titre_page = lieu.id ? 'Modifier le lieu' : 'Ajouter un lieu' %}
+
+{% block admin_title %}{{ titre_page }}{% endblock %}
+
+{% block admin_content %}
+    {% set photo = lieu_photo(lieu) %}
+    <div class="adm-head">
+        <h1 class="adm-h1">{{ titre_page }}</h1>
+        <a class="adm-btn" href="{{ path('app_admin_lieux') }}">← Lieux</a>
+    </div>
+
+    {% for erreur in erreurs %}
+        <p class="adm-alert adm-alert--error" role="alert">{{ erreur }}</p>
+    {% endfor %}
+
+    <form method="post" enctype="multipart/form-data" class="adm-card adm-form adm-form--wide" data-turbo="false">
+        <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+
+        <label class="adm-label" for="nom">Nom</label>
+        <input id="nom" name="nom" type="text" class="adm-input" maxlength="120" value="{{ form.nom }}" placeholder="Majestic Marina" required>
+        <div class="adm-row">
+            <div>
+                <label class="adm-label" for="detail">Précision (facultatif)</label>
+                <input id="detail" name="detail" type="text" class="adm-input" maxlength="160" value="{{ form.detail }}" placeholder="Sofitel Cotonou Marina Hotel">
+            </div>
+            <div>
+                <label class="adm-label" for="adresse">Adresse</label>
+                <input id="adresse" name="adresse" type="text" class="adm-input" maxlength="200" value="{{ form.adresse }}" placeholder="Boulevard de la Marina, Cotonou">
+            </div>
+        </div>
+        <div class="adm-row">
+            <div>
+                <label class="adm-label" for="maps">Recherche Google Maps (facultatif)</label>
+                <input id="maps" name="maps" type="text" class="adm-input" maxlength="255" value="{{ form.maps }}" placeholder="Nom et adresse du lieu">
+            </div>
+            <div>
+                <label class="adm-label" for="capacite">Capacité (facultatif)</label>
+                <input id="capacite" name="capacite" type="text" inputmode="numeric" pattern="[0-9 ]*" class="adm-input" value="{{ form.capacite }}" placeholder="Places dans la salle" autocomplete="off">
+            </div>
+        </div>
+        <p class="adm-help">Capacité&nbsp;: toutes les places, même celles qui ne sont pas mises en vente. Sert au pourcentage de remplissage du bilan (/ventes)&nbsp;; un évènement peut avoir la sienne.</p>
+
+        <h2 class="adm-h2 adm-h2--section">Photo</h2>
+        <div class="adm-form" data-controller="poster crop" data-poster-max-width-value="{{ constant('App\\Site\\PhotosLieux::MAX_WIDTH') }}" data-poster-message-value="Aperçu : enregistrez le lieu pour mettre la photo en ligne.">
+            <div class="adm-lieu__photo">
+                <img src="{{ photo }}" alt="" class="media-cover" style="object-position: {{ form.cadrageX }}% {{ form.cadrageY }}%" data-poster-target="preview" data-crop-target="preview"{{ photo ? '' : ' hidden' }}>
+            </div>
+            <label class="adm-label" for="photo">{{ photo ? 'Remplacer la photo' : 'Ajouter une photo' }}</label>
+            <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-poster-target="input" data-action="poster#pick">
+            <p class="adm-help" role="status" data-poster-target="status">JPEG, PNG ou WebP, en paysage (idéalement 16:9). L'image est réduite automatiquement.</p>
+
+            <div class="adm-row">
+                <div>
+                    <label class="adm-label" for="cadrageX">Cadrage horizontal</label>
+                    <input id="cadrageX" name="cadrageX" type="range" min="0" max="100" value="{{ form.cadrageX }}" data-crop-target="x" data-action="input->crop#update">
+                </div>
+                <div>
+                    <label class="adm-label" for="cadrageY">Cadrage vertical</label>
+                    <input id="cadrageY" name="cadrageY" type="range" min="0" max="100" value="{{ form.cadrageY }}" data-crop-target="y" data-action="input->crop#update">
+                </div>
+            </div>
+            <label class="adm-label" for="photoAlt">Description de la photo</label>
+            <input id="photoAlt" name="photoAlt" type="text" class="adm-input" maxlength="200" value="{{ form.photoAlt }}" placeholder="Fauteuils en velours rouge, salle du Majestic Marina">
+            <p class="adm-help">Lue à voix haute aux personnes malvoyantes.</p>
+            {% if photo %}
+                <label class="adm-check">
+                    <input type="checkbox" name="retirer" value="1"{{ form.retirer ? ' checked' }}>
+                    <span><strong>Retirer la photo</strong><br><span class="adm-muted">Le lieu s'affiche alors sans image.</span></span>
+                </label>
+            {% endif %}
+            <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary" data-poster-target="submit">Enregistrer</button></p>
+        </div>
+    </form>
+{% endblock %}

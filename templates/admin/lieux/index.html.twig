@@ -1,0 +1,51 @@
+{% extends 'admin/layout.html.twig' %}
+{% set active = 'lieux' %}
+
+{% block admin_title %}Lieux{% endblock %}
+
+{% block admin_content %}
+    <div class="adm-head">
+        <h1 class="adm-h1">Lieux</h1>
+        <a class="adm-btn adm-btn--primary" href="{{ path('app_admin_lieu_nouveau') }}">Ajouter un lieu</a>
+    </div>
+    <p class="adm-muted">Un lieu apparaît sur l'accueil dès qu'un évènement affiché s'y tient.</p>
+
+    <div class="adm-lieux">
+        {% for ligne in lignes %}
+            {% set l = ligne.l %}
+            {% set photo = lieu_photo(l) %}
+            <section class="adm-card adm-lieu">
+                <div class="adm-lieu__photo">
+                    {% if photo %}<img src="{{ photo }}" alt="{{ l.photoAlt }}" class="media-cover" style="object-position: {{ l.cadrageX }}% {{ l.cadrageY }}%" loading="lazy">{% else %}<span class="adm-muted">Aucune photo</span>{% endif %}
+                </div>
+                <h2 class="adm-h2">{{ l.nom }}</h2>
+                <p class="adm-muted">
+                    {{ [l.detail, l.adresse]|filter(v => v)|join(', ') ?: 'Aucune adresse' }}<br>
+                    {{ l.capacite ? l.capacite|number_format(0, ',', ' ') ~ ' places' : 'Capacité non renseignée' }} · {{ ligne.evenements }} évènement{{ ligne.evenements > 1 ? 's' }}
+                </p>
+                <div class="adm-actions">
+                    <a class="adm-btn adm-btn--small" href="{{ path('app_admin_lieu', {id: l.id}) }}">Modifier</a>
+                    <a class="adm-btn adm-btn--small" href="{{ path('app_admin_evenement_nouveau', {lieu: l.id}) }}">Ajouter un évènement ici</a>
+                    {% if ligne.evenements == 0 %}
+                        <form method="post" action="{{ path('app_admin_lieu_supprimer', {id: l.id}) }}" onsubmit="return confirm('Supprimer définitivement ce lieu et sa photo ?');">
+                            <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                            <button type="submit" class="adm-btn adm-btn--small adm-btn--danger">Supprimer</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </section>
+        {% else %}
+            <section class="adm-card"><p class="adm-empty">Aucun lieu.</p></section>
+        {% endfor %}
+    </div>
+
+    <form method="post" action="{{ path('app_admin_lieux_section') }}" class="adm-card adm-form adm-form--wide">
+        <h2 class="adm-h2">Section «&nbsp;Les salles&nbsp;» de l'accueil</h2>
+        <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+        <label class="adm-label" for="lieux_titre">Titre</label>
+        <input id="lieux_titre" name="lieux_titre" type="text" class="adm-input" maxlength="120" value="{{ section.lieux_titre }}">
+        <label class="adm-label" for="lieux_phrase">Phrase sous les lieux (facultatif)</label>
+        <input id="lieux_phrase" name="lieux_phrase" type="text" class="adm-input" maxlength="300" value="{{ section.lieux_phrase }}">
+        <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary">Enregistrer les textes</button></p>
+    </form>
+{% endblock %}

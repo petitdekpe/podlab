@@ -1,0 +1,55 @@
+{% extends 'admin/layout.html.twig' %}
+{% set active = 'directs' %}
+
+{% block admin_title %}Directs{% endblock %}
+
+{% block admin_content %}
+    <div class="adm-head">
+        <h1 class="adm-h1">Directs</h1>
+        <a class="adm-btn adm-btn--primary" href="{{ path('app_admin_direct_nouveau') }}">Ajouter un direct</a>
+    </div>
+    <p class="adm-muted">La page du direct présente celui en cours, sinon le prochain. Un direct terminé y reste affiché une heure.</p>
+
+    {% for l in lignes %}
+        {% set d = l.d %}
+        <section class="adm-card">
+            <h2 class="adm-h2">
+                {{ d.titre }}
+                <span class="adm-seance__state{{ l.phase == 'en_cours' ? ' adm-seance__state--en_vente' }}">{{ {avant: 'À venir', en_cours: 'En cours', termine: 'Terminé'}[l.phase] }}</span>
+                {% if not d.publie %}<span class="adm-seance__state">Masqué</span>{% elseif d is same as(actuel) %}<span class="adm-seance__state">Sur la page du direct</span>{% endif %}
+                {% if not d.accesOuvert %}<span class="adm-seance__state adm-seance__state--complet">Accès fermé</span>{% endif %}
+            </h2>
+            <p class="adm-muted">
+                Du {{ d.ouverture|date('d/m/Y H:i', 'Africa/Porto-Novo') }} au {{ d.fin|date('d/m/Y H:i', 'Africa/Porto-Novo') }} (heure du Bénin){% if d.evenement %} · séance {{ d.evenement.libelle }}{% endif %}<br>
+                {{ l.stats.total }} billet{{ l.stats.total > 1 ? 's' }} validé{{ l.stats.total > 1 ? 's' }} · {{ l.stats.active }} connecté{{ l.stats.active > 1 ? 's' }} maintenant
+            </p>
+            {% if l.phase != 'termine' %}
+                {% if not d.youtube %}<p class="adm-alert adm-alert--error">Aucune vidéo YouTube.</p>{% endif %}
+                {% if not d.tickafricaEventId %}<p class="adm-alert adm-alert--error">Aucun événement Tick Africa : aucun nouveau billet ne peut être validé.</p>{% endif %}
+                {% if not d.billetterie %}<p class="adm-alert adm-alert--error">Aucun lien d'achat : le site annonce une billetterie à venir.</p>{% endif %}
+            {% endif %}
+            <div class="adm-actions">
+                <a class="adm-btn adm-btn--small" href="{{ path('app_admin_direct', {id: d.id}) }}">Configurer</a>
+                <a class="adm-btn adm-btn--small" href="{{ path('app_admin_codes', {direct: d.id}) }}">Billets</a>
+                {% if l.phase != 'termine' %}
+                    <form method="post" action="{{ path('app_admin_direct_acces', {id: d.id}) }}"{% if d.accesOuvert %} onsubmit="return confirm('Fermer l\'accès à tous les billets de ce direct ?');"{% endif %}>
+                        <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                        <button type="submit" class="adm-btn adm-btn--small{{ d.accesOuvert ? ' adm-btn--danger' }}">{{ d.accesOuvert ? 'Fermer l\'accès' : 'Ouvrir l\'accès' }}</button>
+                    </form>
+                {% endif %}
+                <form method="post" action="{{ path('app_admin_direct_publier', {id: d.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                    <button type="submit" class="adm-btn adm-btn--small">{{ d.publie ? 'Masquer' : 'Afficher' }}</button>
+                </form>
+                {% if l.stats.total == 0 %}
+                    <form method="post" action="{{ path('app_admin_direct_supprimer', {id: d.id}) }}" onsubmit="return confirm('Supprimer définitivement ce direct ?');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                        <button type="submit" class="adm-btn adm-btn--small adm-btn--danger">Supprimer</button>
+                    </form>
+                {% endif %}
+            </div>
+        </section>
+    {% else %}
+        <section class="adm-card"><p class="adm-empty">Aucun direct.</p></section>
+    {% endfor %}
+{% endblock %}

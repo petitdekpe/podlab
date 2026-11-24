@@ -10,13 +10,17 @@ use Doctrine\ORM\Mapping as ORM;
  */
 #[ORM\Entity(repositoryClass: LiveCodeRepository::class)]
 #[ORM\Table(name: 'live_code')]
-#[ORM\UniqueConstraint(name: 'uniq_live_code_code', columns: ['code'])]
+#[ORM\UniqueConstraint(name: 'uniq_live_code_direct_code', columns: ['direct_id', 'code'])]
 class LiveCode
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
+
+    /** Direct pour lequel ce billet a été validé : il n'en ouvre aucun autre */
+    #[ORM\ManyToOne]
+    private ?Direct $direct;
 
     /** Code du billet Tick Africa, casse comprise : kR4mNpQ2 */
     #[ORM\Column(length: 64)]
@@ -42,8 +46,9 @@ class LiveCode
     #[ORM\Column(length: 64, nullable: true)]
     private ?string $claimToken = null;
 
-    public function __construct(string $code, ?string $label = null)
+    public function __construct(Direct $direct, string $code, ?string $label = null)
     {
+        $this->direct = $direct;
         $this->code = $code;
         $this->label = $label;
         $this->createdAt = new \DateTimeImmutable();
@@ -52,6 +57,11 @@ class LiveCode
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getDirect(): ?Direct
+    {
+        return $this->direct;
     }
 
     public function getCode(): string

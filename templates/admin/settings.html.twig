@@ -4,7 +4,7 @@
 {% block admin_title %}Paramètres{% endblock %}
 
 {% block admin_content %}
-    <h1 class="adm-h1">Paramètres du direct</h1>
+    <h1 class="adm-h1">Paramètres</h1>
 
     {% for error in errors %}
         <p class="adm-alert adm-alert--error" role="alert">{{ error }}</p>
@@ -13,41 +13,7 @@
     <form method="post" class="adm-card adm-form adm-form--wide">
         <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
 
-        <label class="adm-label" for="title">Titre affiché sur la page du direct</label>
-        <input id="title" name="title" type="text" class="adm-input" maxlength="120" value="{{ form.title }}">
-
-        <label class="adm-label" for="youtube">Vidéo YouTube du direct</label>
-        <input id="youtube" name="youtube" type="text" class="adm-input" value="{{ form.youtube }}" placeholder="https://www.youtube.com/watch?v=… ou identifiant" autocomplete="off" spellcheck="false">
-        <p class="adm-help">Vidéo « non répertoriée », intégration autorisée, <strong>option DVR désactivée</strong> dans YouTube Studio (sinon les spectateurs peuvent reculer). Jamais visible dans le code de la page : elle n'est fournie qu'aux billets valides.</p>
-
-        <div class="adm-row">
-            <div>
-                <label class="adm-label" for="opens_at">Ouverture du direct</label>
-                <input id="opens_at" name="opens_at" type="datetime-local" class="adm-input" value="{{ form.opens_at }}" required>
-            </div>
-            <div>
-                <label class="adm-label" for="ends_at">Fin du direct</label>
-                <input id="ends_at" name="ends_at" type="datetime-local" class="adm-input" value="{{ form.ends_at }}" required>
-            </div>
-        </div>
-        <p class="adm-help">Heure du Bénin ({{ timezone }}). Avant l'ouverture, les spectateurs voient un décompte. Après la fin, la vidéo est retirée.</p>
-
-        <label class="adm-check">
-            <input type="checkbox" name="enabled" value="1"{{ form.enabled ? ' checked' }}>
-            <span><strong>Accès ouvert</strong><br><span class="adm-muted">Décochez pour fermer l'accès à tous les billets d'un coup (le supercode reste valable).</span></span>
-        </label>
-
-        <label class="adm-check">
-            <input type="checkbox" name="watermark" value="1"{{ form.watermark ? ' checked' }}>
-            <span><strong>Filigrane avec le numéro du billet</strong><br><span class="adm-muted">Un texte discret se déplace sur la vidéo : il permet de retrouver l'origine d'un enregistrement partagé.</span></span>
-        </label>
-
-        {# Identifiants proposés à la saisie : les événements publiés de la clé #}
-        <datalist id="tickafrica-events">
-            {% for event in tickafrica_events %}<option value="{{ event.id }}">{{ event.label }}</option>{% endfor %}
-        </datalist>
-
-        <h2 class="adm-h2 adm-h2--section">Connexion à Tick Africa</h2>
+        <h2 class="adm-h2">Connexion à Tick Africa</h2>
 
         <p class="adm-help">
             Clé utilisée&nbsp;:
@@ -84,82 +50,6 @@
             Laissé vide, le site envoie <code>{{ form.return_url ?: return_url_default }}</code>&nbsp;: c'est cette adresse qu'il faut copier sur la clé.
         </p>
 
-        <h2 class="adm-h2 adm-h2--section">Billets du direct</h2>
-
-        <label class="adm-label" for="tickafrica_event_id">Identifiant de l'événement « accès au direct »</label>
-        <input id="tickafrica_event_id" name="tickafrica_event_id" type="text" class="adm-input" list="tickafrica-events" value="{{ form.tickafrica_event_id }}" placeholder="{{ tickafrica_event_default ?: '9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d' }}" autocomplete="off" spellcheck="false">
-        <p class="adm-help">
-            UUID de l'événement Tick Africa dont les billets ouvrent le direct. Les billets d'un autre événement (la salle, par exemple) sont refusés et ne sont pas consommés.
-            {% if tickafrica_events %}Cliquez dans le champ pour choisir parmi vos événements.{% endif %}
-            {% if tickafrica_event_default %}Laissé vide, c'est la valeur par défaut du site qui est utilisée : <code>{{ tickafrica_event_default }}</code>{% else %}Tant qu'il est vide, aucun nouveau billet n'est accepté.{% endif %}
-        </p>
-
-        <h2 class="adm-h2 adm-h2--section">Billetterie des séances</h2>
-        <p class="adm-help">
-            Reliez chaque séance à son événement Tick Africa{% if tickafrica_events %} (cliquez dans le champ pour choisir parmi vos événements){% endif %}.
-            Si deux séances partagent un même événement, indiquez pour chacune l'identifiant de son billet (plusieurs : séparés par des virgules).
-            Les identifiants des billets s'affichent avec <code>php bin/console app:tickafrica:event &lt;uuid&gt;</code>.
-        </p>
-
-        {% for key, seance in form.seances %}
-            {% set etat = seances_etat[key] ?? null %}
-            <fieldset class="adm-seance">
-                <legend class="adm-seance__title">
-                    {{ seance.label }}
-                    {% if etat %}
-                        <span class="adm-seance__state adm-seance__state--{{ etat.status }}">
-                            {{ {en_vente: 'En vente', complet: 'Complet', passee: 'Terminée', fermee: 'Vente fermée', indisponible: 'Non reliée ou injoignable'}[etat.status] }}
-                        </span>
-                    {% endif %}
-                </legend>
-                <div class="adm-row">
-                    <div>
-                        <label class="adm-label" for="seance-{{ key }}-event">Événement Tick Africa</label>
-                        <input id="seance-{{ key }}-event" name="seances[{{ key }}][event]" type="text" class="adm-input" list="tickafrica-events" value="{{ seance.event }}" placeholder="{{ seance.default ?: 'UUID de l\'événement' }}" autocomplete="off" spellcheck="false">
-                    </div>
-                    <div>
-                        <label class="adm-label" for="seance-{{ key }}-tarifs">Billets à vendre (facultatif)</label>
-                        <input id="seance-{{ key }}-tarifs" name="seances[{{ key }}][tarifs]" type="text" class="adm-input" value="{{ seance.tarifs }}" placeholder="Tous les billets de l'événement" autocomplete="off" spellcheck="false">
-                    </div>
-                    <div>
-                        <label class="adm-label" for="seance-{{ key }}-capacite">Capacité de la salle (facultatif)</label>
-                        <input id="seance-{{ key }}-capacite" name="seances[{{ key }}][capacite]" type="text" inputmode="numeric" pattern="[0-9 ]*" class="adm-input" value="{{ seance.capacite }}" placeholder="Places dans la salle" autocomplete="off">
-                    </div>
-                </div>
-                <p class="adm-help">Capacité&nbsp;: toutes les places de la salle, même celles qui ne sont pas mises en vente. Sert au pourcentage de remplissage du bilan (/ventes).</p>
-                {% if etat and (etat.eventName or etat.reason) %}
-                    <p class="adm-help">
-                        {% if etat.eventName %}Événement trouvé chez Tick Africa&nbsp;: <strong>{{ etat.eventName }}</strong>.{% endif %}
-                        {% if etat.reason and etat.reason != 'complet_force' %}
-                            {% if etat.status != 'en_vente' %}<strong>Pourquoi&nbsp;?</strong>{% endif %}
-                            {{ constant('App\\Billetterie\\Seance::REASONS')[etat.reason] ?? etat.reason }}
-                        {% endif %}
-                    </p>
-                {% endif %}
-                {% if etat and etat.tarifs|length > 0 %}
-                    <p class="adm-help">
-                        {% for t in etat.tarifs %}
-                            {{ t.name }} · {{ t.price|number_format(0, ',', ' ') }} FCFA · {{ t.remaining is null ? 'illimité' : t.remaining ~ ' restante(s)' }} · <code>{{ t.id }}</code>{% if not loop.last %}<br>{% endif %}
-                        {% endfor %}
-                    </p>
-                {% elseif not seance.event and seance.default %}
-                    <p class="adm-help">Vide&nbsp;: valeur du serveur utilisée (<code>{{ seance.default }}</code>).</p>
-                {% endif %}
-            </fieldset>
-        {% endfor %}
-
-        <label class="adm-check">
-            <input type="checkbox" name="soldout" value="1"{{ form.soldout ? ' checked' }}>
-            <span><strong>Séance du 22 novembre « Sold out »</strong><br><span class="adm-muted">Affiche la séance du 22 au Majestic Marina comme complète, avec le bouton d'achat d'un accès au direct. Les séances du 29 suivent la disponibilité en temps réel de Tick Africa. Décochez pour remettre la séance du 22 en vente (son événement doit alors être renseigné ci-dessus).</span></span>
-        </label>
-
-        <label class="adm-label" for="live_ticket_url">Billetterie des accès au direct (Tickafrica)</label>
-        <input id="live_ticket_url" name="live_ticket_url" type="url" class="adm-input" value="{{ form.live_ticket_url }}" placeholder="{{ live_ticket_default ?: 'https://tick.africa/embed/…' }}" autocomplete="off" spellcheck="false">
-        <p class="adm-help">
-            Lien d'intégration (embed) Tickafrica de l'événement « accès au direct », affiché dans la fenêtre pop-up.
-            {% if live_ticket_default %}Laissé vide, c'est le lien par défaut du site qui est utilisé : <code>{{ live_ticket_default }}</code>{% else %}Tant qu'il est vide, la fenêtre indique que la billetterie ouvre bientôt.{% endif %}
-        </p>
-
         <h2 class="adm-h2 adm-h2--section">Mesure d'audience</h2>
 
         <label class="adm-label" for="analytics_id">Google Analytics : identifiant de mesure</label>
@@ -168,6 +58,32 @@
 
         <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary">Enregistrer</button></p>
     </form>
+
+    <section class="adm-card" id="affiche" data-controller="poster" data-poster-max-width-value="{{ constant('App\\Site\\Affiche::MAX_WIDTH') }}">
+        <h2 class="adm-h2">Affiche de l'accueil</h2>
+        {% for message in app.flashes('affiche_ok') %}<p class="adm-alert adm-alert--ok" role="status">{{ message }}</p>{% endfor %}
+        {% for message in app.flashes('affiche_error') %}<p class="adm-alert adm-alert--error" role="alert">{{ message }}</p>{% endfor %}
+
+        <div class="adm-poster">
+            <img src="{{ affiche ? path('app_affiche', { v: affiche.version }) : asset(constant('App\\Site\\Affiche::ORIGINE')) }}" alt="Affiche" class="adm-poster__img" data-poster-target="preview">
+            <div class="adm-poster__body">
+                <form method="post" action="{{ path('app_admin_affiche') }}" enctype="multipart/form-data" class="adm-form" data-turbo="false">
+                    <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                    <label class="adm-label" for="affiche-fichier">Nouvelle affiche</label>
+                    <input id="affiche-fichier" name="affiche" type="file" accept="image/jpeg,image/png,image/webp" required data-poster-target="input" data-action="poster#pick">
+                    <p class="adm-help" role="status" data-poster-target="status">JPEG, PNG ou WebP, en portrait (idéalement 4:5). L'image est réduite automatiquement.</p>
+                    <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary" data-poster-target="submit">Remplacer l'affiche</button></p>
+                </form>
+                {% if affiche %}
+                    <form method="post" action="{{ path('app_admin_affiche') }}" data-turbo="false" onsubmit="return confirm('Revenir à l\'affiche d\'origine ? L\'image envoyée sera supprimée.');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('admin') }}">
+                        <input type="hidden" name="retablir" value="1">
+                        <button type="submit" class="adm-btn adm-btn--small">Revenir à l'affiche d'origine</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    </section>
 
     <section class="adm-card" id="tickafrica-diagnostic">
         <h2 class="adm-h2">Diagnostic Tick Africa</h2>

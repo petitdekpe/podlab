@@ -4,10 +4,17 @@ namespace App\Controller;
 
 use App\Billetterie\Billetterie;
 use App\Billetterie\Commande;
+use App\Billetterie\Seance;
+use App\Entity\Direct;
 use App\Live\LiveSettings;
 use App\Live\TickAfrica;
 use App\Live\TickAfricaUnavailable;
+use App\Programme\Programme;
+use App\Site\Affiche;
+use App\Site\DateFr;
+use App\Site\PhotosLieux;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,6 +30,8 @@ final class HomeController extends AbstractController
         private readonly LiveSettings $settings,
         private readonly Billetterie $billetterie,
         private readonly TickAfrica $tickAfrica,
+        private readonly Affiche $affiche,
+        private readonly Programme $programme,
     ) {
     }
 
@@ -134,6 +143,44 @@ final class HomeController extends AbstractController
         return $response;
     }
 
+    /** Affiche envoyée depuis /admin. L'adresse change avec l'image (?v=) : cache long sans risque. */
+    #[Route('/affiche.jpg', name: 'app_affiche', methods: ['GET'])]
+    public function affiche(): Response
+    {
+        return $this->image($this->affiche->fichier() ?? throw $this->createNotFoundException());
+    }
+
+    /** Photo d'un lieu envoyée depuis /admin. Chaque photo a son adresse : cache long sans risque. */
+    #[Route('/lieux/{fichier}', name: 'app_lieu_photo', requirements: ['fichier' => PhotosLieux::MOTIF], methods: ['GET'])]
+    public function photoLieu(string $fichier, PhotosLieux $photos): Response
+    {
+        return $this->image($photos->fichier($fichier) ?? throw $this->createNotFoundException());
+    }
+
+    private function image(string $fichier): Response
+    {
+        $response = new BinaryFileResponse($fichier, headers: ['Content-Type' => 'image/jpeg', 'X-Content-Type-Options' => 'nosniff']);
+        $response->setPublic();
+        $response->setMaxAge(31536000);
+        $response->setImmutable();
+
+        return $response;
+    }
+
+    /**
+     * Texte de /admin, ou texte d'origine si la base est indisponible.
+     *
+     * @param \Closure(): string $lire
+     */
+    private function texteLieux(\Closure $lire, string $defaut): string
+    {
+        try {
+            return $lire();
+        } catch (\Throwable) {
+            return $defaut;
+        }
+    }
+
     /**
      * Où Tick Africa renvoie l'acheteur après paiement. Doit être IDENTIQUE à une URL
      * enregistrée sur la clé : celle saisie dans /admin, sinon /billetterie/merci en https.
@@ -151,43 +198,39 @@ final class HomeController extends AbstractController
 
     private function page(Commande $commande, int $status = Response::HTTP_OK): Response
     {
-        // Réglages modifiables dans /admin. Si la base est indisponible, la page reste
-        // affichée avec les valeurs par défaut (pas de billetterie du direct, filigrane).
-        try {
-            $liveTicketUrl = $this->settings->liveTicketUrl();
-            $watermark = $this->settings->watermark();
-            $ouvertureDirect = $this->settings->opensAt();
-            $finDirect = $this->settings->endsAt();
-        } catch (\Throwable) {
-            $watermark = true;
-            $liveTicketUrl = $this->settings->defaultLiveTicketUrl(); // ne lit pas la base
-            $ouvertureDirect = $finDirect = null;
-        }
-
         $now = new \DateTimeImmutable();
         $seances = $this->billetterie->seances();
         $prochaine = $this->billetterie->prochaine();
+        $directs = $this->programme->directsAVenir($now);
+        $enVente = array_filter($seances, static fn (Seance $s): bool => $s->onSale());
+        $aVenir = array_filter($seances, static fn (Seance $s): bool => $s->aVenir());
+        $dates = static fn (array $liste): string => DateFr::liste(array_map(static fn (Seance $s): \DateTimeImmutable => $s->startsAt, $liste));
 
-        // Le direct du 22 est proposé tant qu'il n'est pas terminé
-        $seanceDirect = null;
+        $salles = [];
         foreach ($seances as $seance) {
-            if ($seance->liveAccess) {
-                $seanceDirect = $seance;
-            }
+            $salles[$seance->salle['name']]['lieu'] = $seance->evenement->lieu;
+            $salles[$seance->salle['name']]['seances'][] = $seance;
         }
 
         $response = $this->render('home/index.html.twig', [
             'seances' => $seances,
+            'a_venir' => $aVenir,
+            'dates_a_venir' => $dates($aVenir),
+            'dates_en_vente' => $dates($enVente),
+            'salles' => $salles,
+            'lieux_titre' => $this->texteLieux(fn (): string => $this->settings->lieuxTitre(), LiveSettings::LIEUX_TITRE),
+            'lieux_phrase' => $this->texteLieux(fn (): string => $this->settings->lieuxPhrase(), LiveSettings::LIEUX_PHRASE),
+            'affiche' => $this->affiche->personnalisee(),
+            // Spectacle à l'affiche : celui de la prochaine séance, sinon de la dernière
+            'vedette' => $prochaine ?? (array_values($seances)[\count($seances) - 1] ?? null),
             'prochaine' => $prochaine,
-            'en_vente' => $this->billetterie->enVente(),
+            'en_vente' => [] !== $enVente,
             'decompte' => $this->decompte($prochaine?->startsAt ?? $now),
             'commande' => $commande,
             'csrf_id' => self::CSRF_ID,
-            'seance_direct' => $seanceDirect,
+            'directs' => $directs,
             // Pendant le direct, un bandeau mène à /live (la billetterie des séances reste accessible)
-            'direct_en_cours' => null !== $ouvertureDirect && null !== $finDirect && $now >= $ouvertureDirect && $now < $finDirect,
-            'live_ticket_url' => $liveTicketUrl,
-            'watermark' => $watermark,
+            'direct_en_cours' => array_values(array_filter($directs, static fn (Direct $d): bool => Direct::EN_COURS === $d->phase($now)))[0] ?? null,
         ], new Response(status: $status));
 
         // Places restantes en temps réel : pas de cache navigateur ni intermédiaire

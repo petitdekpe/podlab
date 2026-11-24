@@ -7,7 +7,7 @@
         <p class="status status--open">Places disponibles</p>
     {% endif %}
 {% elseif s.soldOut %}
-    <p class="status status--soldout">Sold out{% if s.liveAccess %} · direct en ligne{% endif %}</p>
+    <p class="status status--soldout">Sold out{% if s.direct %} · direct en ligne{% endif %}</p>
 {% elseif s.status == 'passee' %}
     <p class="status">Terminée</p>
 {% elseif s.status == 'fermee' %}

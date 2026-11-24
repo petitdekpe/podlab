@@ -27,7 +27,7 @@
     </div>
 {% endmacro %}
 
-{% block title %}Ventes du 29 novembre · Podlab × Bénin Bouge{% endblock %}
+{% block title %}Bilan des ventes · Podlab × Bénin Bouge{% endblock %}
 
 {% block meta %}
     <meta name="robots" content="noindex, nofollow">
@@ -39,6 +39,7 @@
     {% import _self as f %}
     {% set g = r.global %}
     {% set seances = r.seances %}
+    {% set quand = seances|map(s => s.quand)|reduce((l, q) => q in l ? l : l|merge([q]), []) %}
 
     <div class="vt-page">
     <header class="adm-top">
@@ -57,9 +58,9 @@
 
     <main class="adm-main">
         <div class="vt-title">
-            <h1 class="adm-h1">Dimanche 29 novembre · 13h00</h1>
+            <h1 class="adm-h1">{{ quand|length == 1 ? quand|first : 'Bilan des ventes' }}</h1>
             <p class="adm-muted">
-                {% if g.jours_restants > 1 %}J-{{ g.jours_restants|round(0, 'ceil') }}{% elseif g.jours_restants > 0 %}Dans moins de 24 h{% else %}Séances passées{% endif %}
+                {% if g.jours_restants > 1 %}J-{{ g.jours_restants|round(0, 'ceil') }}{% elseif g.jours_restants > 0 %}Dans moins de 24 h{% else %}{{ seances ? 'Séances passées' : 'Aucune séance suivie' }}{% endif %}
                 · mis à jour à {{ r.at|date('H\\hi', 'Africa/Porto-Novo') }}
             </p>
         </div>
@@ -69,14 +70,14 @@
 
         <div class="vt-blocs">
             <section class="adm-card vt-bloc vt-bloc--total">
-                <h2 class="vt-bloc__name">Total des deux séances</h2>
+                <h2 class="vt-bloc__name">Total{{ seances|length > 1 ? ' des ' ~ seances|length ~ ' séances' }}</h2>
                 <p class="vt-bloc__big">{{ f.n(g.vendus) }} <span class="vt-bloc__unit">tickets vendus</span></p>
                 {{ f.jauges(g, tous) }}
             </section>
 
             {% for key, s in seances %}
                 <section class="adm-card vt-bloc">
-                    <h2 class="vt-bloc__name"><span class="vt-dot vt-s{{ couleurs[key] }}" aria-hidden="true"></span>{{ s.salle|replace({'Majestic ': ''}) }}</h2>
+                    <h2 class="vt-bloc__name"><span class="vt-dot vt-s{{ couleurs[key] }}" aria-hidden="true"></span>{{ s.salle|replace({'Majestic ': ''}) }}{% if quand|length > 1 %} <span class="vt-bloc__unit">{{ s.quand }}</span>{% endif %}</h2>
                     <p class="vt-bloc__big">{{ f.n(s.vendus) }} <span class="vt-bloc__unit">vendus</span></p>
                     {{ f.jauges(s, [{c: couleurs[key], v: s.vendus}]) }}
                 </section>
@@ -111,7 +112,7 @@
             <summary>Comment ces chiffres sont calculés</summary>
             <ul class="vt-notes">
                 <li>Ventes = tickets vendus ÷ tickets mis en vente chez Tick Africa.</li>
-                <li>Remplissage = tickets vendus ÷ capacité de la salle, saisie dans /admin › Paramètres.</li>
+                <li>Remplissage = tickets vendus ÷ capacité de la salle, saisie dans /admin › Évènements.</li>
                 <li>Tickets vendus, d'après :
                     {% for s in seances %}{{ s.salle }}, {{ s.source == 'billetterie' ? 'le stock Tick Africa' : (s.source == 'commandes' ? 'les commandes payées' : 'indisponible') }}{{ not loop.last ? ' ; ' }}{% endfor %}.</li>
                 <li>Champs reçus de Tick Africa · billet : {{ r.champs.produit|join(', ') ?: '—' }} · commande : {{ r.champs.commande|join(', ') ?: '—' }}</li>

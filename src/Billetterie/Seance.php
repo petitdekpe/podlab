@@ -2,6 +2,10 @@
 
 namespace App\Billetterie;
 
+use App\Entity\Direct;
+use App\Entity\Evenement;
+use App\Site\DateFr;
+
 /**
  * Une séance telle qu'affichée sur le site : ce qui est fixé par nous (date,
  * salle) et ce que Tick Africa nous dit en temps réel (tarifs, places restantes).
@@ -16,19 +20,22 @@ final class Seance
     /** Tick Africa injoignable, ou séance pas encore reliée à un événement */
     public const INDISPONIBLE = 'indisponible';
 
+    public readonly string $key;
+    public readonly string $titre;
+    public readonly \DateTimeImmutable $startsAt;
+    /** @var array{name: string, sub: string, address: string, maps: string} */
+    public readonly array $salle;
+    public readonly string $eventId;
+
     /**
-     * @param array{name: string, sub: string, address: string, maps: string} $salle
-     * @param list<Tarif>                                                       $tarifs
+     * @param list<Tarif> $tarifs
      */
     public function __construct(
-        public readonly string $key,
-        public readonly \DateTimeImmutable $startsAt,
-        public readonly array $salle,
+        public readonly Evenement $evenement,
         public readonly string $status,
         public readonly array $tarifs = [],
-        /** La séance propose l'accès payant au direct en ligne (pop-up du site) */
-        public readonly bool $liveAccess = false,
-        public readonly string $eventId = '',
+        /** Direct en ligne de cette séance, à venir ou en cours */
+        public readonly ?Direct $direct = null,
         /** Données affichées issues du dernier relevé réussi (Tick Africa injoignable depuis) */
         public readonly bool $stale = false,
         /** Pourquoi la séance n'est pas en vente (voir REASONS), pour l'administration */
@@ -36,11 +43,25 @@ final class Seance
         /** Nom de l'événement chez Tick Africa, pour vérifier qu'on a relié le bon */
         public readonly string $eventName = '',
     ) {
+        $this->key = $evenement->getCle();
+        $this->titre = $evenement->titre;
+        $this->startsAt = $evenement->debut();
+        $this->salle = $evenement->salle();
+        $this->eventId = $evenement->tickafricaEventId;
     }
+
+    /** Nom de $status, pour l'administration. */
+    public const ETATS = [
+        self::EN_VENTE => 'En vente',
+        self::COMPLET => 'Complet',
+        self::PASSEE => 'Terminé',
+        self::FERMEE => 'Vente fermée',
+        self::INDISPONIBLE => 'Non relié ou injoignable',
+    ];
 
     /** Explication de $reason, pour l'administration. */
     public const REASONS = [
-        'complet_force' => 'Marquée « Sold out » dans ces paramètres.',
+        'complet_force' => 'Marquée « Sold out » dans l\'administration.',
         'passee' => 'La séance a eu lieu.',
         'non_reliee' => 'Aucun événement Tick Africa renseigné.',
         'sans_cle' => 'Aucune clé API Tick Africa.',
@@ -56,33 +77,37 @@ final class Seance
     /** « Dimanche 29 novembre » (heure du Bénin) */
     public function jour(): string
     {
-        $d = $this->local();
-
-        return sprintf('%s %d %s', ucfirst(self::DAYS[(int) $d->format('w')]), (int) $d->format('j'), self::MONTHS[(int) $d->format('n')]);
+        return DateFr::jour($this->startsAt);
     }
 
     /** « Dim. 29 nov. » */
     public function jourCourt(): string
     {
-        $d = $this->local();
+        return DateFr::jourCourt($this->startsAt);
+    }
 
-        return sprintf('%s. %d %s', ucfirst(mb_substr(self::DAYS[(int) $d->format('w')], 0, 3)), (int) $d->format('j'), self::MONTHS_SHORT[(int) $d->format('n')]);
+    /** « Dim. » */
+    public function semaineCourte(): string
+    {
+        return DateFr::semaineCourte($this->startsAt);
+    }
+
+    /** « nov. » */
+    public function moisCourt(): string
+    {
+        return DateFr::moisCourt($this->startsAt);
     }
 
     /** « 13h00 » */
     public function heure(): string
     {
-        return $this->local()->format('G\hi');
+        return DateFr::heure($this->startsAt);
     }
 
-    private function local(): \DateTimeImmutable
+    public function aVenir(): bool
     {
-        return $this->startsAt->setTimezone(new \DateTimeZone('Africa/Porto-Novo'));
+        return $this->startsAt > new \DateTimeImmutable();
     }
-
-    private const DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-    private const MONTHS = ['', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-    private const MONTHS_SHORT = ['', 'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
     public function onSale(): bool
     {

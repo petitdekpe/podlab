@@ -6,7 +6,7 @@
     <meta name="robots" content="noindex, nofollow">
 {% endblock %}
 
-{% set heure_ouverture = opens_at|date("H\\hi", 'Africa/Porto-Novo') %}
+{% set heure_ouverture = opens_at is defined ? opens_at|date("H\\hi", 'Africa/Porto-Novo') : '' %}
 
 {% block body %}
     <header class="container site-header">
@@ -25,7 +25,7 @@
 
     <main class="container live">
         <p class="eyebrow">Édition spéciale en direct</p>
-        <h1 class="live__title">{{ title }}</h1>
+        <h1 class="live__title">{{ title ?: 'Le direct' }}</h1>
 
         {# ---------- Code d'accès ---------- #}
         {% if etat == 'verrouille' %}
@@ -140,6 +140,14 @@
             <section class="live__panel">
                 <h2 class="live__panel-title">L'accès au direct est momentanément fermé</h2>
                 <p class="live__panel-text">Réessayez dans quelques instants ou contactez les organisateurs.</p>
+            </section>
+
+        {# ---------- Aucun direct ---------- #}
+        {% elseif etat == 'aucun' %}
+            <section class="live__panel">
+                <h2 class="live__panel-title">Aucun direct n'est prévu pour le moment</h2>
+                <p class="live__panel-text">Suivez Podlab et Bénin Bouge pour l'annonce du prochain.</p>
+                <a href="{{ path('app_home') }}" data-turbo="false" class="btn btn--outline">Retour au site</a>
             </section>
 
         {# ---------- Terminé ---------- #}

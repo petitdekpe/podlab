@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Bilan des ventes des séances du 29 novembre (/ventes), ouvert avec un code
+ * Bilan des ventes des évènements suivis (/ventes), ouvert avec un code
  * d'accès (VENTES_CODE). Indépendant de /admin : on peut le confier à
  * l'équipe sans lui donner le supercode.
  */
@@ -62,8 +62,8 @@ final class VentesController extends AbstractController
         }
 
         return $this->page($this->render('ventes/index.html.twig', [
-            'r' => $this->ventes->rapport($request->query->getBoolean('actualiser')),
-            'couleurs' => ['marina-28' => 1, 'wologuede-28' => 2],
+            'r' => $r = $this->ventes->rapport($request->query->getBoolean('actualiser')),
+            'couleurs' => array_map(static fn (int $i): int => $i % 6 + 1, array_flip(array_keys($r['seances']))),
         ]));
     }
 

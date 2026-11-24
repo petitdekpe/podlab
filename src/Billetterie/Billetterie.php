@@ -2,40 +2,27 @@
 
 namespace App\Billetterie;
 
-use App\Live\LiveSettings;
+use App\Entity\Direct;
+use App\Entity\Evenement;
 use App\Live\TickAfrica;
 use App\Live\TickAfricaUnavailable;
+use App\Programme\Programme;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Billetterie des séances en salle, vendue par l'API Organisateur de Tick Africa.
  *
- * Dates et salles sont fixées ici ; tarifs, prix et places restantes sont lus
- * chez Tick Africa (GET /events/{id}, gardé 30 s en cache). Si Tick Africa ne
- * répond pas, on affiche le dernier relevé connu plutôt qu'une page vide.
+ * Dates et salles viennent du Programme (géré dans /admin) ; tarifs, prix et places
+ * restantes sont lus chez Tick Africa (GET /events/{id}, gardé 30 s en cache). Si
+ * Tick Africa ne répond pas, on affiche le dernier relevé connu plutôt qu'une page vide.
  *
- * Chaque séance est reliée à un événement Tick Africa par une variable
- * d'environnement : « uuid-evenement » ou « uuid-evenement:uuid-tarif,uuid-tarif »
- * pour ne retenir que certains billets (deux séances dans un même événement).
+ * Chaque évènement est relié à un événement Tick Africa, et peut n'en retenir que
+ * certains billets (deux séances dans un même événement).
  */
-final class Billetterie
+final class Billetterie implements ResetInterface
 {
-    public const SALLES = [
-        'marina' => [
-            'name' => 'Majestic Marina',
-            'sub' => 'Sofitel Cotonou Marina Hotel',
-            'address' => 'Boulevard de la Marina, Cotonou',
-            'maps' => 'Sofitel Cotonou Marina Hotel, Boulevard de la Marina, Cotonou',
-        ],
-        'wologuede' => [
-            'name' => 'Majestic Wologuèdè',
-            'sub' => 'Majestic Cinéma',
-            'address' => 'Wologuèdè, Cotonou',
-            'maps' => 'Majestic Cinéma Wologuèdè, Cotonou',
-        ],
-    ];
-
     private const FRESH_TTL = 30;
     private const RETRY_TTL = 10;
     private const LAST_GOOD_TTL = 86400 * 7;
@@ -45,12 +32,9 @@ final class Billetterie
 
     public function __construct(
         private readonly TickAfrica $tickAfrica,
-        private readonly LiveSettings $settings,
+        private readonly Programme $programme,
         private readonly CacheItemPoolInterface $cache,
         private readonly LoggerInterface $logger,
-        private readonly string $marina22 = '',
-        private readonly string $marina28 = '',
-        private readonly string $wologuede28 = '',
     ) {
     }
 
@@ -65,67 +49,30 @@ final class Billetterie
             return $this->seances;
         }
 
-        // Réglages de /admin : si la base ne répond pas, la séance du 22 reste complète
-        // et les séances sont reliées aux événements de l'environnement
-        $liens = $this->defaultLinks();
-        try {
-            $complet22 = $this->settings->soldOut();
-            $finDirect = $this->settings->endsAt();
-            foreach ($liens as $key => $defaut) {
-                $liens[$key] = $this->settings->seanceLink($key) ?: $defaut;
+        $directs = [];
+        foreach ($this->programme->directsAVenir() as $direct) {
+            if (null !== $direct->evenement) {
+                $directs[$direct->evenement->getCle()] ??= $direct;
             }
-        } catch (\Throwable) {
-            $complet22 = true;
-            $finDirect = new \DateTimeImmutable('2026-11-22T16:00:00+01:00');
         }
 
-        $plan = [
-            ['marina-22', '2026-11-22T13:00:00+01:00', 'marina', $liens['marina-22'], $complet22, new \DateTimeImmutable() < $finDirect],
-            ['marina-28', '2026-11-29T13:00:00+01:00', 'marina', $liens['marina-28'], false, false],
-            ['wologuede-28', '2026-11-29T13:00:00+01:00', 'wologuede', $liens['wologuede-28'], false, false],
-        ];
-
         $this->seances = [];
-        foreach ($plan as [$key, $start, $salle, $link, $forcedSoldOut, $live]) {
-            $this->seances[$key] = $this->build($key, new \DateTimeImmutable($start), $salle, $link, $forcedSoldOut, $live);
+        foreach ($this->programme->evenements() as $evenement) {
+            $this->seances[$evenement->getCle()] = $this->build($evenement, $directs[$evenement->getCle()] ?? null);
         }
 
         return $this->seances;
     }
 
-    /**
-     * Événements de l'environnement (TICKAFRICA_SEANCE_…), utilisés tant que rien n'est saisi dans /admin.
-     *
-     * @return array<string, string>
-     */
-    public function defaultLinks(): array
-    {
-        return ['marina-22' => $this->marina22, 'marina-28' => $this->marina28, 'wologuede-28' => $this->wologuede28];
-    }
-
-    /**
-     * Lien effectif de chaque séance : celui de /admin, sinon celui de l'environnement.
-     *
-     * @return array<string, string>
-     */
-    public function links(): array
-    {
-        $liens = $this->defaultLinks();
-        try {
-            foreach ($liens as $key => $defaut) {
-                $liens[$key] = $this->settings->seanceLink($key) ?: $defaut;
-            }
-        } catch (\Throwable) {
-            // base indisponible : liens de l'environnement
-        }
-
-        return $liens;
-    }
-
-    /** Oublie les séances déjà calculées (après un changement de réglage dans /admin). */
-    public function refresh(): void
+    public function reset(): void
     {
         $this->seances = null;
+    }
+
+    /** État d'un évènement, même masqué (pour l'administration). */
+    public function etat(Evenement $evenement): Seance
+    {
+        return $this->seances()[$evenement->getCle()] ?? $this->build($evenement, null);
     }
 
     /** Première séance encore à venir et en vente, sinon première à venir. */
@@ -141,17 +88,6 @@ final class Billetterie
         }
 
         return array_values($avenir)[0] ?? null;
-    }
-
-    public function enVente(): bool
-    {
-        foreach ($this->seances() as $seance) {
-            if ($seance->onSale()) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**
@@ -254,27 +190,28 @@ final class Billetterie
         return $errors;
     }
 
-    private function build(string $key, \DateTimeImmutable $start, string $salle, string $link, bool $forcedSoldOut, bool $live): Seance
+    private function build(Evenement $evenement, ?Direct $direct): Seance
     {
-        [$eventId, $productIds] = self::parseLink($link);
-        $base = [$key, $start, self::SALLES[$salle]];
+        $eventId = $evenement->tickafricaEventId;
+        $productIds = $evenement->tarifs();
+        $seance = static fn (string $status, string $reason): Seance => new Seance($evenement, $status, direct: $direct, reason: $reason);
 
-        if ($forcedSoldOut) {
-            return new Seance(...$base, status: Seance::COMPLET, liveAccess: $live, eventId: $eventId, reason: 'complet_force');
+        if ($evenement->complet) {
+            return $seance(Seance::COMPLET, 'complet_force');
         }
-        if ($start <= new \DateTimeImmutable()) {
-            return new Seance(...$base, status: Seance::PASSEE, eventId: $eventId, reason: 'passee');
+        if ($evenement->debut() <= new \DateTimeImmutable()) {
+            return $seance(Seance::PASSEE, 'passee');
         }
         if ('' === $eventId || !$this->tickAfrica->isConfigured()) {
-            return new Seance(...$base, status: Seance::INDISPONIBLE, eventId: $eventId, reason: '' === $eventId ? 'non_reliee' : 'sans_cle');
+            return $seance(Seance::INDISPONIBLE, '' === $eventId ? 'non_reliee' : 'sans_cle');
         }
 
         [$event, $stale, $notFound] = $this->event($eventId);
         if ($notFound) {
-            return new Seance(...$base, status: Seance::FERMEE, eventId: $eventId, reason: 'introuvable');
+            return $seance(Seance::FERMEE, 'introuvable');
         }
         if (null === $event) {
-            return new Seance(...$base, status: Seance::INDISPONIBLE, eventId: $eventId, reason: 'injoignable');
+            return $seance(Seance::INDISPONIBLE, 'injoignable');
         }
 
         $products = array_values(array_filter(\is_array($event['products'] ?? null) ? $event['products'] : [], 'is_array'));
@@ -297,7 +234,7 @@ final class Billetterie
             default => [Seance::EN_VENTE, ''],
         };
 
-        return new Seance(...$base, status: $status, tarifs: $tarifs, eventId: $eventId, stale: $stale, reason: $reason, eventName: (string) ($event['name'] ?? ''));
+        return new Seance($evenement, $status, $tarifs, $direct, $stale, $reason, (string) ($event['name'] ?? ''));
     }
 
     /**
@@ -330,20 +267,5 @@ final class Billetterie
     private function cacheKey(string $eventId): string
     {
         return 'tickafrica.event.'.$eventId;
-    }
-
-    /**
-     * @return array{0: string, 1: list<string>}
-     */
-    public static function parseLink(string $link): array
-    {
-        [$event, $products] = array_pad(explode(':', trim($link), 2), 2, '');
-        $event = LiveSettings::normalizeUuid($event);
-        $products = array_values(array_filter(array_map(
-            static fn (string $id): string => LiveSettings::normalizeUuid($id),
-            explode(',', $products),
-        )));
-
-        return [$event, $products];
     }
 }
