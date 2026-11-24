@@ -54,7 +54,7 @@
 
 {% block body %}
     {% if direct_en_cours %}
-        <a href="{{ path('app_live') }}" class="live-banner">
+        <a href="{{ path('app_live') }}" class="live-banner" data-turbo="false">
             <span class="live-banner__dot" aria-hidden="true"></span>
             <span>Le direct du 22 novembre est en cours. <strong>Rejoindre le direct</strong></span>
             {{ icone_fleche }}
@@ -467,5 +467,8 @@
             <span>Une Édition Spéciale Podlab × Bénin Bouge, en partenariat avec Majestic Bénin et Tick Africa, sponsors officiels.</span>
         </div>
         <span>Une question&nbsp;? Écrivez-nous sur WhatsApp au 0166617878 ou à contact@beninbouge.com.</span>
+        {% if analytics_id() %}<button type="button" class="site-footer__cookies" data-cookies>Cookies</button>{% endif %}
     </footer>
 {% endblock %}
+
+{% block analytics %}{{ include('_analytics.html.twig') }}{% endblock %}

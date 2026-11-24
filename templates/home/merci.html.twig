@@ -10,7 +10,7 @@
 
 {% block body %}
     <header class="container site-header">
-        <a href="{{ path('app_home') }}" class="brand" aria-label="Podlab × Bénin Bouge">
+        <a href="{{ path('app_home') }}" data-turbo="false" class="brand" aria-label="Podlab × Bénin Bouge">
             <img src="{{ asset('images/logo-podlab.jpg') }}" alt="Podlab" class="brand__podlab">
             <span class="brand__times" aria-hidden="true">×</span>
             <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="brand__bb">
@@ -42,10 +42,12 @@
                 <p class="live__panel-text">Ouverture des portes à 12h30, fermeture à 12h55&nbsp;: aucune entrée après, même avec un billet.</p>
             {% endif %}
 
-            <a href="{{ path('app_home') }}{{ statut in ['cancelled', 'refunded'] ? '#reservation' }}" class="btn btn--primary">
+            <a href="{{ path('app_home') }}{{ statut in ['cancelled', 'refunded'] ? '#reservation' }}" data-turbo="false" class="btn btn--primary">
                 {{ statut in ['cancelled', 'refunded'] ? 'Recommencer ma réservation' : 'Retour au site' }}
             </a>
             <p class="live__hint-text">Une question&nbsp;? WhatsApp 0166617878 ou contact@beninbouge.com.</p>
         </div>
     </main>
 {% endblock %}
+
+{% block analytics %}{{ include('_analytics.html.twig', { retour_paiement: true, premiere_vue: n == 1 }) }}{% endblock %}

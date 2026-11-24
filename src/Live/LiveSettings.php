@@ -99,6 +99,19 @@ final class LiveSettings
         return ctype_digit($valeur) && (int) $valeur > 0 ? (int) $valeur : null;
     }
 
+    /** Identifiant de mesure Google Analytics (G-XXXXXXXXXX), ou '' : pas de mesure d'audience. */
+    public function analyticsId(): string
+    {
+        return self::normalizeAnalyticsId((string) $this->get('analytics_id'));
+    }
+
+    public static function normalizeAnalyticsId(string $value): string
+    {
+        $value = strtoupper(trim($value));
+
+        return preg_match('/^G-[A-Z0-9]{4,20}$/', $value) ? $value : '';
+    }
+
     public function title(): string
     {
         $title = trim((string) $this->get('title'));

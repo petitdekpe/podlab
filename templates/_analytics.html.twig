@@ -1,0 +1,22 @@
+{# Google Analytics, sur les pages publiques seulement (ni /admin ni /ventes).
+   Rien n'est chargé ni déposé tant que le visiteur n'a pas accepté : voir analytics_controller.js.
+   Variables facultatives : retour_paiement (page de retour), premiere_vue, achat (achat confirmé). #}
+{% set ga_id = analytics_id() %}
+{% if ga_id %}
+    <section
+        class="cookies"
+        aria-label="Cookies"
+        data-controller="analytics"
+        data-analytics-id-value="{{ ga_id }}"
+        data-analytics-return-value="{{ retour_paiement|default(false) ? 'true' : 'false' }}"
+        data-analytics-page-view-value="{{ (premiere_vue ?? true) ? 'true' : 'false' }}"
+        {% if achat|default(null) %}data-analytics-purchase-value="{{ achat|json_encode }}"{% endif %}
+        hidden
+    >
+        <p class="cookies__text">Acceptez-vous les cookies de mesure d'audience (Google Analytics)&nbsp;?</p>
+        <div class="cookies__actions">
+            <button type="button" class="btn btn--sm btn--quiet" data-action="analytics#refuse">Refuser</button>
+            <button type="button" class="btn btn--sm btn--quiet" data-action="analytics#accept">Accepter</button>
+        </div>
+    </section>
+{% endif %}

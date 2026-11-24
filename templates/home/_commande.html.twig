@@ -36,7 +36,7 @@
                                 required
                                 {{ actif ? '' : 'disabled' }}
                                 {{ actif and commande.billet == valeur ? 'checked' }}
-                                {% if actif %}data-price="{{ t.price }}" data-max="{{ t.maxPerOrder }}"{% endif %}
+                                {% if actif %}data-price="{{ t.price }}" data-max="{{ t.maxPerOrder }}" data-item="{{ s.article(t)|json_encode }}"{% endif %}
                             >
                             <span class="dial__date">
                                 <span class="dial__weekday">{{ s.jourCourt|split(' ')|first }}</span>

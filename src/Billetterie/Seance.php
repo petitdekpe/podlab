@@ -111,6 +111,21 @@ final class Seance
         return array_values(array_filter($this->tarifs, static fn (Tarif $t): bool => $t->available));
     }
 
+    /**
+     * Le billet de cette séance, au format « item » de Google Analytics.
+     *
+     * @return array<string, string|int>
+     */
+    public function article(Tarif $tarif): array
+    {
+        return [
+            'item_id' => $this->key,
+            'item_name' => $this->salle['name'].' · '.$this->jourCourt(),
+            'item_variant' => $tarif->name,
+            'price' => $tarif->price,
+        ];
+    }
+
     /** Prix le plus bas parmi les billets en vente (ou tous les billets), null si inconnu. */
     public function prixMin(): ?int
     {

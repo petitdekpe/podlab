@@ -2617,3 +2617,44 @@ html.is-modal-open { overflow: hidden; }
 @media (forced-colors: active) {
     .vt-s1, .vt-s2 { background: CanvasText; forced-color-adjust: none; }
 }
+
+/* ==========================================================================
+   Bandeau de cookies (mesure d'audience)
+   ========================================================================== */
+.cookies {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 30;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 20px;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 14px 16px;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 14px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+}
+.cookies[hidden] { display: none; }
+.cookies__text { flex: 1 1 320px; margin: 0; font-size: 14px; line-height: 1.45; color: var(--color-text-muted); }
+.cookies__actions { display: flex; gap: 10px; }
+.cookies__actions .btn { flex: 1 1 auto; font-size: 15px; }
+
+.site-footer__cookies {
+    padding: 8px 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+@media (max-width: 560px) {
+    .cookies__actions { width: 100%; }
+}

@@ -132,6 +132,7 @@ final class AdminController extends AbstractController
             'tickafrica_event_id' => (string) $this->settings->get('tickafrica_event_id'),
             'seances' => $this->seanceFields(),
             'return_url' => $this->settings->returnUrl(),
+            'analytics_id' => $this->settings->analyticsId(),
         ];
         $warnings = [];
 
@@ -151,6 +152,7 @@ final class AdminController extends AbstractController
                     'tickafrica_event_id' => trim((string) $request->request->get('tickafrica_event_id')),
                     'seances' => $this->seanceFields($request->request->all('seances')),
                     'return_url' => trim((string) $request->request->get('return_url')),
+                    'analytics_id' => trim((string) $request->request->get('analytics_id')),
                 ];
                 // La clé n'est jamais réaffichée : champ vide = on garde celle enregistrée
                 $apiKey = trim((string) $request->request->get('tickafrica_api_key'));
@@ -198,6 +200,10 @@ final class AdminController extends AbstractController
                     $errors[] = 'L\'URL de retour après paiement doit être une adresse complète commençant par https://.';
                 }
 
+                if ('' !== $form['analytics_id'] && '' === LiveSettings::normalizeAnalyticsId($form['analytics_id'])) {
+                    $errors[] = 'L\'identifiant de mesure Google Analytics commence par « G- » (ex. G-AB12CD34EF).';
+                }
+
                 if ('' !== $apiKey && !$clearKey) {
                     $keyError = $this->checkApiKey($apiKey, $warnings);
                     if (null !== $keyError) {
@@ -220,6 +226,7 @@ final class AdminController extends AbstractController
                         $this->settings->set('capacite_'.$key, '' === $seance['capacite'] ? null : (string) (int) $seance['capacite']);
                     }
                     $this->settings->set('return_url', $form['return_url'] ?: null);
+                    $this->settings->set('analytics_id', LiveSettings::normalizeAnalyticsId($form['analytics_id']) ?: null);
                     if ($clearKey) {
                         $this->settings->setTickafricaApiKey(null);
                     } elseif ('' !== $apiKey) {

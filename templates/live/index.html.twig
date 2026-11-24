@@ -10,7 +10,7 @@
 
 {% block body %}
     <header class="container site-header">
-        <a href="{{ path('app_home') }}" class="brand" aria-label="Podlab × Bénin Bouge, retour au site">
+        <a href="{{ path('app_home') }}" data-turbo="false" class="brand" aria-label="Podlab × Bénin Bouge, retour au site">
             <img src="{{ asset('images/logo-podlab.jpg') }}" alt="Podlab" class="brand__podlab">
             <span class="brand__times" aria-hidden="true">×</span>
             <img src="{{ asset('images/logo-benin-bouge.png') }}" alt="Bénin Bouge" class="brand__bb">
@@ -147,8 +147,10 @@
             <section class="live__panel">
                 <h2 class="live__panel-title">La diffusion est terminée</h2>
                 <p class="live__panel-text">Merci d'avoir été avec nous. Suivez Podlab et Bénin Bouge pour la suite.</p>
-                <a href="{{ path('app_home') }}" class="btn btn--outline">Retour au site</a>
+                <a href="{{ path('app_home') }}" data-turbo="false" class="btn btn--outline">Retour au site</a>
             </section>
         {% endif %}
     </main>
 {% endblock %}
+
+{% block analytics %}{{ include('_analytics.html.twig') }}{% endblock %}

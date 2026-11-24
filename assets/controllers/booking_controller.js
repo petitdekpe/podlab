@@ -1,4 +1,5 @@
 import { Controller } from '@hotwired/stimulus';
+import { track } from '../analytics.js';
 
 /*
  * Billetterie des séances : formulaire de réservation.
@@ -15,6 +16,7 @@ export default class extends Controller {
     connect() {
         // Places et coordonnées n'apparaissent qu'une fois la séance choisie
         if (this.hasDetailsTarget && !this.selected()) this.detailsTarget.hidden = true;
+        this.choice = this.selected();
         this.update();
     }
 
@@ -51,6 +53,10 @@ export default class extends Controller {
         if (selected && this.hasDetailsTarget && this.detailsTarget.hidden) {
             this.detailsTarget.hidden = false;
         }
+        if (selected && selected !== this.choice) {
+            this.choice = selected;
+            track('select_item', { items: [this.item(selected, 1)] });
+        }
         const max = selected ? Number(selected.dataset.max) || 1 : 10;
         this.quantityTarget.max = max;
 
@@ -73,6 +79,7 @@ export default class extends Controller {
             return;
         }
         this.sending = true;
+        this.trackCheckout();
         if (this.hasSubmitTarget) {
             this.submitTarget.setAttribute('aria-busy', 'true');
             this.submitTarget.classList.add('is-busy');
@@ -88,6 +95,21 @@ export default class extends Controller {
         this.submitTarget.removeAttribute('aria-busy');
         this.submitTarget.classList.remove('is-busy');
         this.submitTarget.firstChild.textContent = 'Payer ';
+    }
+
+    trackCheckout() {
+        const selected = this.selected();
+        if (!selected || !this.hasQuantityTarget) return;
+        const qty = this.clamp(Number(this.quantityTarget.value || 1));
+        track('begin_checkout', {
+            currency: 'XOF',
+            value: Number(selected.dataset.price) * qty,
+            items: [this.item(selected, qty)],
+        });
+    }
+
+    item(radio, quantity) {
+        return { ...JSON.parse(radio.dataset.item), quantity };
     }
 
     selected() {

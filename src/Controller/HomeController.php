@@ -51,9 +51,13 @@ final class HomeController extends AbstractController
             return $this->page($commande, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        if (!$commande->validate($this->billetterie->seances())) {
+        $seances = $this->billetterie->seances();
+        if (!$commande->validate($seances)) {
             return $this->page($commande, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
+
+        $seance = $seances[$commande->seanceKey()];
+        $tarif = $seance->tarif($commande->tarifId());
 
         $retour = $this->returnUrl();
         try {
@@ -85,6 +89,12 @@ final class HomeController extends AbstractController
             'order_id' => $paiement['order_id'],
             'seance' => $commande->seanceKey(),
             'email' => $commande->email,
+            // Mesure d'audience (Google Analytics) : aucune donnée sur l'acheteur
+            'achat' => [
+                'currency' => 'XOF',
+                'value' => $tarif->price * $commande->quantity,
+                'items' => [$seance->article($tarif) + ['quantity' => $commande->quantity]],
+            ],
         ]);
 
         // Le paiement se déroule chez Tick Africa, qui renvoie ensuite vers /billetterie/merci
@@ -113,6 +123,10 @@ final class HomeController extends AbstractController
             'email' => \is_array($derniere) ? ($derniere['email'] ?? null) : null,
             'relance' => \in_array($statut, ['pending', 'processing'], true) && $request->query->getInt('n') < 6,
             'n' => $request->query->getInt('n') + 1,
+            // Achat compté seulement si le paiement est confirmé, jamais avec une clé de test
+            'achat' => 'validated' === $statut && isset($derniere['achat']) && !$this->tickAfrica->isTestMode()
+                ? ['transaction_id' => $derniere['order_id']] + $derniere['achat']
+                : null,
         ]);
         $response->setPrivate();
         $response->headers->addCacheControlDirective('no-store');

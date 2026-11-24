@@ -160,6 +160,12 @@
             {% if live_ticket_default %}Laissé vide, c'est le lien par défaut du site qui est utilisé : <code>{{ live_ticket_default }}</code>{% else %}Tant qu'il est vide, la fenêtre indique que la billetterie ouvre bientôt.{% endif %}
         </p>
 
+        <h2 class="adm-h2 adm-h2--section">Mesure d'audience</h2>
+
+        <label class="adm-label" for="analytics_id">Google Analytics : identifiant de mesure</label>
+        <input id="analytics_id" name="analytics_id" type="text" class="adm-input" maxlength="30" value="{{ form.analytics_id }}" placeholder="G-XXXXXXXXXX" autocomplete="off" spellcheck="false">
+        <p class="adm-help">Dans Google Analytics&nbsp;: Administration, Flux de données, votre site. Mesure les pages publiques seulement, après accord du visiteur. Vide&nbsp;: ni mesure, ni bandeau de cookies.</p>
+
         <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary">Enregistrer</button></p>
     </form>
 
