@@ -2,6 +2,7 @@
 
 namespace App\Billetterie;
 
+use App\Live\LiveSettings;
 use App\Live\TickAfrica;
 use App\Live\TickAfricaUnavailable;
 use Psr\Cache\CacheItemPoolInterface;
@@ -17,8 +18,9 @@ use Psr\Log\LoggerInterface;
  *   la recette, le panier moyen et les paiements non aboutis.
  *
  * Places vendues = champ « vendu » du billet, sinon capacité − restantes,
- * sinon billets des commandes payées. Places totales = capacité, sinon
- * vendues + restantes. Le bilan est gardé 60 s en cache.
+ * sinon billets des commandes payées. Places totales = capacité de la salle
+ * saisie dans /admin, sinon stock du billet (capacité Tick Africa, ou vendues
+ * + restantes). Le bilan est gardé 60 s en cache.
  */
 final class Ventes
 {
@@ -44,6 +46,7 @@ final class Ventes
         private readonly Billetterie $billetterie,
         private readonly CacheItemPoolInterface $cache,
         private readonly LoggerInterface $logger,
+        private readonly LiveSettings $settings,
     ) {
     }
 
@@ -276,6 +279,17 @@ final class Ventes
         $restantes = $somme('restantes');
         $valeur = $somme('valeur');
 
+        // Capacité de la salle saisie dans /admin : elle remplace le stock de billets
+        // comme base du remplissage, des places restantes et de la projection.
+        // Le stock Tick Africa reste affiché à part (billets encore en vente).
+        $stock = $total;
+        $enVente = $restantes;
+        $capaciteSalle = $this->capaciteSalle($ligne['key']);
+        if (null !== $capaciteSalle) {
+            $total = $capaciteSalle;
+            $restantes = null !== $vendues ? max(0, $capaciteSalle - $vendues) : null;
+        }
+
         // Recette : celle des commandes si elles expliquent toutes les places vendues,
         // sinon la valeur des places vendues au prix du billet
         $recetteReelle = $commandesOk && null !== $vendues && $billetsCommandes === $vendues && $recetteCommandes > 0;
@@ -321,6 +335,9 @@ final class Ventes
             'total' => $total,
             'vendues' => $vendues,
             'restantes' => $restantes,
+            'capacite_salle' => null !== $capaciteSalle,
+            'stock' => $stock,
+            'en_vente' => $enVente,
             'illimite' => [] !== $tarifs && null === $restantes,
             'taux' => null !== $total && $total > 0 && null !== $vendues ? $vendues / $total : null,
             'recette' => $recette,
@@ -342,6 +359,16 @@ final class Ventes
             'premiere_vente' => $premiere,
             'ventes' => array_map(static fn (array $v): array => ['billets' => $v['billets'], 'date' => $v['date']], $datees),
         ];
+    }
+
+    /** Capacité de la salle saisie dans /admin ; null si absente ou base injoignable. */
+    private function capaciteSalle(string $seance): ?int
+    {
+        try {
+            return $this->settings->seanceCapacity($seance);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -367,6 +394,8 @@ final class Ventes
             'total' => $total,
             'vendues' => $vendues,
             'restantes' => $somme('restantes'),
+            'en_vente' => $somme('en_vente'),
+            'capacite_salle' => [] !== $seances && !\in_array(false, array_column($seances, 'capacite_salle'), true),
             'taux' => null !== $total && $total > 0 && null !== $vendues ? $vendues / $total : null,
             'recette' => $somme('recette'),
             'recette_reelle' => [] !== $seances && !\in_array(false, array_column($seances, 'recette_reelle'), true),

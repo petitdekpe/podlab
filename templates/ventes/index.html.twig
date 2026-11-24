@@ -10,6 +10,7 @@
 {% block meta %}
     <meta name="robots" content="noindex, nofollow">
     <meta http-equiv="refresh" content="120">
+    {{ include('ventes/_apercu.html.twig') }}
 {% endblock %}
 
 {% block body %}
@@ -147,9 +148,15 @@
                     </div>
 
                     <dl class="vt-stats">
-                        <div><dt>Places totales</dt><dd>{{ s.illimite ? 'illimité' : f.n(s.total) }}</dd></div>
+                        <div><dt>{{ s.capacite_salle ? 'Capacité salle' : 'Places totales' }}</dt><dd>{{ s.illimite ? 'illimité' : f.n(s.total) }}</dd></div>
                         <div><dt>Vendues</dt><dd>{{ f.n(s.vendues) }}</dd></div>
-                        <div><dt>Restantes</dt><dd>{{ s.illimite ? 'illimité' : f.n(s.restantes) }}</dd></div>
+                        <div>
+                            <dt>Restantes</dt>
+                            <dd>{{ s.illimite ? 'illimité' : f.n(s.restantes) }}</dd>
+                            {% if s.capacite_salle and s.en_vente is not null and s.en_vente != s.restantes %}
+                                <dd class="vt-kpis__note">dont {{ f.n(s.en_vente) }} en vente</dd>
+                            {% endif %}
+                        </div>
                         <div><dt>Recette{{ s.recette_reelle ? '' : ' (est.)' }}</dt><dd>{{ f.fcfa(s.recette) }}</dd></div>
                         <div><dt>Ventes 24 h</dt><dd>{{ r.commandes_ok ? '+' ~ f.n(s.h24) : '—' }}</dd></div>
                         <div><dt>Ventes 7 jours</dt><dd>{{ r.commandes_ok ? '+' ~ f.n(s.j7) : '—' }}</dd></div>
@@ -176,15 +183,26 @@
                     {% if s.tarifs|length > 0 %}
                         <div class="adm-tablewrap">
                             <table class="adm-table vt-table">
-                                <thead><tr><th>Billet</th><th>Prix</th><th>Vendues</th><th>Restantes</th><th>Remplissage</th></tr></thead>
+                                {% if s.capacite_salle %}
+                                    {# Rapporté à la salle : part de la capacité occupée par chaque billet #}
+                                    <thead><tr><th>Billet</th><th>Prix</th><th>Vendues</th><th>En vente</th><th>Part de la salle</th></tr></thead>
+                                {% else %}
+                                    <thead><tr><th>Billet</th><th>Prix</th><th>Vendues</th><th>Restantes</th><th>Remplissage</th></tr></thead>
+                                {% endif %}
                                 <tbody>
                                     {% for t in s.tarifs %}
                                         <tr>
                                             <td data-label="Billet">{{ t.nom }}{% if not t.en_vente %} <span class="adm-tag">hors vente</span>{% endif %}</td>
                                             <td data-label="Prix">{{ f.fcfa(t.prix) }}</td>
-                                            <td data-label="Vendues">{{ f.n(t.vendues) }}{% if t.total is not null %} / {{ f.n(t.total) }}{% endif %}</td>
-                                            <td data-label="Restantes">{{ t.restantes is null ? 'illimité' : f.n(t.restantes) }}</td>
-                                            <td data-label="Remplissage">{{ f.pct(t.taux) }}</td>
+                                            {% if s.capacite_salle %}
+                                                <td data-label="Vendues">{{ f.n(t.vendues) }} / {{ f.n(s.total) }}</td>
+                                                <td data-label="En vente">{{ t.restantes is null ? 'illimité' : f.n(t.restantes) }}</td>
+                                                <td data-label="Part de la salle">{{ f.pct(t.vendues is null ? null : t.vendues / s.total) }}</td>
+                                            {% else %}
+                                                <td data-label="Vendues">{{ f.n(t.vendues) }}{% if t.total is not null %} / {{ f.n(t.total) }}{% endif %}</td>
+                                                <td data-label="Restantes">{{ t.restantes is null ? 'illimité' : f.n(t.restantes) }}</td>
+                                                <td data-label="Remplissage">{{ f.pct(t.taux) }}</td>
+                                            {% endif %}
                                         </tr>
                                     {% endfor %}
                                 </tbody>
@@ -249,10 +267,11 @@
         <details class="vt-details adm-muted">
             <summary>Comment ces chiffres sont calculés</summary>
             <ul class="vt-notes">
-                <li>Places restantes : stock en temps réel de chaque billet chez Tick Africa (ventes du site et de tick.africa confondues).</li>
+                <li>Places totales : capacité de la salle saisie dans /admin › Paramètres ; à défaut, stock du billet chez Tick Africa.
+                    {% for s in seances %}{{ s.salle }} : {{ s.capacite_salle ? 'capacité de la salle' : 'stock Tick Africa (capacité de la salle non renseignée)' }}{{ not loop.last ? ' ; ' }}{% endfor %}.</li>
+                <li>Places restantes : places totales − vendues. « En vente » : stock en temps réel de chaque billet chez Tick Africa (ventes du site et de tick.africa confondues).</li>
                 <li>Places vendues :
-                    {% for s in seances %}{{ s.salle }} : {{ s.source == 'billetterie' ? 'stock Tick Africa (capacité − restantes)' : (s.source == 'commandes' ? 'somme des commandes payées' : 'indisponible') }}{{ not loop.last ? ' ; ' }}{% endfor %}.
-                    Places totales : capacité fournie par Tick Africa, sinon vendues + restantes.</li>
+                    {% for s in seances %}{{ s.salle }} : {{ s.source == 'billetterie' ? 'stock Tick Africa (capacité − restantes)' : (s.source == 'commandes' ? 'somme des commandes payées' : 'indisponible') }}{{ not loop.last ? ' ; ' }}{% endfor %}.</li>
                 <li>Rythme : moyenne des 7 derniers jours. Projection : places vendues + rythme × jours restants.</li>
                 <li>Les chiffres sont relus chez Tick Africa au plus toutes les 60 secondes.</li>
                 <li>Champs reçus de Tick Africa · billet : {{ r.champs.produit|join(', ') ?: '—' }} · commande : {{ r.champs.commande|join(', ') ?: '—' }}</li>

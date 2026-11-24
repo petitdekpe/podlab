@@ -184,6 +184,9 @@ final class AdminController extends AbstractController
                     if ('' !== $seance['tarifs'] && '' === $seance['event']) {
                         $errors[] = sprintf('Séance « %s » : indiquez l\'événement avant de restreindre les billets.', $seance['label']);
                     }
+                    if ('' !== $seance['capacite'] && (!ctype_digit($seance['capacite']) || (int) $seance['capacite'] < 1 || (int) $seance['capacite'] > 100000)) {
+                        $errors[] = sprintf('Séance « %s » : la capacité de la salle doit être un nombre entier de places (ex. 180).', $seance['label']);
+                    }
                     foreach (array_filter(array_map('trim', explode(',', $seance['tarifs']))) as $tarif) {
                         if ('' === LiveSettings::normalizeUuid($tarif)) {
                             $errors[] = sprintf('Séance « %s » : « %s » n\'est pas un identifiant de billet (UUID).', $seance['label'], $tarif);
@@ -214,6 +217,7 @@ final class AdminController extends AbstractController
                     $this->settings->set('tickafrica_event_id', LiveSettings::normalizeUuid($form['tickafrica_event_id']) ?: null);
                     foreach ($form['seances'] as $key => $seance) {
                         $this->settings->set('seance_'.$key, self::seanceLink($seance) ?: null);
+                        $this->settings->set('capacite_'.$key, '' === $seance['capacite'] ? null : (string) (int) $seance['capacite']);
                     }
                     $this->settings->set('return_url', $form['return_url'] ?: null);
                     if ($clearKey) {
@@ -285,7 +289,7 @@ final class AdminController extends AbstractController
      *
      * @param array<string, mixed>|null $posted
      *
-     * @return array<string, array{label: string, event: string, tarifs: string, default: string}>
+     * @return array<string, array{label: string, event: string, tarifs: string, capacite: string, default: string}>
      */
     private function seanceFields(?array $posted = null): array
     {
@@ -297,11 +301,13 @@ final class AdminController extends AbstractController
             if (null !== $posted) {
                 $event = trim((string) ($posted[$key]['event'] ?? ''));
                 $tarifs = trim((string) ($posted[$key]['tarifs'] ?? ''));
+                $capacite = preg_replace('/\s+/', '', (string) ($posted[$key]['capacite'] ?? '')) ?? '';
             } else {
                 [$event, $ids] = Billetterie::parseLink($this->settings->seanceLink($key));
                 $tarifs = implode(', ', $ids);
+                $capacite = (string) ($this->settings->seanceCapacity($key) ?? '');
             }
-            $fields[$key] = ['label' => $labels[$key], 'event' => $event, 'tarifs' => $tarifs, 'default' => $defaults[$key] ?? ''];
+            $fields[$key] = ['label' => $labels[$key], 'event' => $event, 'tarifs' => $tarifs, 'capacite' => $capacite, 'default' => $defaults[$key] ?? ''];
         }
 
         return $fields;

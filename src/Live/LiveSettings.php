@@ -87,6 +87,18 @@ final class LiveSettings
         return trim((string) $this->get('seance_'.$seance));
     }
 
+    /**
+     * Capacité totale de la salle pour une séance, saisie dans /admin ; null si
+     * non renseignée. Sert au bilan /ventes : le remplissage se calcule sur la
+     * salle entière et non sur les seuls billets mis en vente chez Tick Africa.
+     */
+    public function seanceCapacity(string $seance): ?int
+    {
+        $valeur = trim((string) $this->get('capacite_'.$seance));
+
+        return ctype_digit($valeur) && (int) $valeur > 0 ? (int) $valeur : null;
+    }
+
     public function title(): string
     {
         $title = trim((string) $this->get('title'));

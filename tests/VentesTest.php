@@ -2,6 +2,11 @@
 
 namespace App\Tests;
 
+use App\Entity\Setting;
+use App\Live\LiveConfig;
+use App\Live\LiveSettings;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityRepository;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -52,6 +57,35 @@ final class VentesTest extends WebTestCase
         self::assertSame([], $this->urls); // rien n'est lu chez Tick Africa sans le code
     }
 
+    public function testLinkPreviewIsPodlabBeninBouge(): void
+    {
+        $crawler = $this->client()->request('GET', '/ventes');
+
+        // Les robots d'aperçu n'ont pas le code : c'est la page de code qu'ils lisent
+        self::assertMatchesRegularExpression('#^https?://[^/]+/assets/images/og-avant-premiere(-[\w-]+)?\.png$#', $crawler->filter('meta[property="og:image"]')->attr('content'));
+        self::assertSame('Podlab × Bénin Bouge', $crawler->filter('meta[property="og:image:alt"]')->attr('content'));
+        self::assertSame('summary_large_image', $crawler->filter('meta[name="twitter:card"]')->attr('content'));
+    }
+
+    public function testStatsUseHallCapacityWhenSet(): void
+    {
+        $client = $this->client(['capacite_marina-28' => '200', 'capacite_wologuede-28' => '100']);
+        $client->request('GET', '/ventes');
+        $client->submitForm('Voir les ventes', ['code' => '1003']);
+        $crawler = $client->followRedirect();
+
+        // 7 + 3 vendues sur 200 + 100 places dans les salles (et non 100 + 50 billets en vente)
+        self::assertSame('10 / 300', preg_replace('/\s+/u', ' ', trim($crawler->filter('.vt-hero__big')->text())));
+        self::assertStringContainsString('290 places restantes', $crawler->filter('.vt-hero__main')->text());
+        self::assertSame(['4 %', '3 %'], $crawler->filter('.vt-seance__big')->each(fn ($n) => trim(explode(' rempli', $n->text())[0])));
+
+        $marina = $crawler->filter('.vt-seance')->first();
+        self::assertStringContainsString('Capacité salle', $marina->filter('.vt-stats')->text());
+        self::assertStringContainsString('193', $marina->filter('.vt-stats')->text());
+        self::assertStringContainsString('dont 93 en vente', $marina->filter('.vt-stats')->text());
+        self::assertStringContainsString('Part de la salle', $marina->filter('.vt-table')->text());
+    }
+
     public function testDashboardWithRightCode(): void
     {
         $client = $this->client();
@@ -78,10 +112,22 @@ final class VentesTest extends WebTestCase
         self::assertContains('GET /orders event_id='.self::MARINA, $this->urls);
     }
 
-    private function client(): KernelBrowser
+    /** @param array<string, string>|null $settings réglages de /admin simulés (null : base absente) */
+    private function client(?array $settings = null): KernelBrowser
     {
         $client = static::createClient();
         $client->disableReboot();
+        if (null !== $settings) {
+            $repository = $this->createStub(EntityRepository::class);
+            $repository->method('findAll')->willReturn(array_map(
+                static fn (string $name, string $value): Setting => new Setting($name, $value),
+                array_keys($settings),
+                $settings,
+            ));
+            $em = $this->createStub(EntityManagerInterface::class);
+            $em->method('getRepository')->willReturn($repository);
+            static::getContainer()->set(LiveSettings::class, new LiveSettings($em, static::getContainer()->get(LiveConfig::class)));
+        }
         $now = new \DateTimeImmutable();
 
         $event = fn (string $tarif, string $nom, string $prix, int $restantes): string => json_encode(['success' => true, 'data' => [
