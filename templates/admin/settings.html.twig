@@ -126,7 +126,7 @@
                         <input id="seance-{{ key }}-capacite" name="seances[{{ key }}][capacite]" type="text" inputmode="numeric" pattern="[0-9 ]*" class="adm-input" value="{{ seance.capacite }}" placeholder="Places dans la salle" autocomplete="off">
                     </div>
                 </div>
-                <p class="adm-help">Capacité&nbsp;: sert au bilan des ventes (/ventes), qui calcule alors le remplissage sur la salle entière plutôt que sur les billets mis en vente.</p>
+                <p class="adm-help">Capacité&nbsp;: toutes les places de la salle, même celles qui ne sont pas mises en vente. Sert au pourcentage de remplissage du bilan (/ventes).</p>
                 {% if etat and (etat.eventName or etat.reason) %}
                     <p class="adm-help">
                         {% if etat.eventName %}Événement trouvé chez Tick Africa&nbsp;: <strong>{{ etat.eventName }}</strong>.{% endif %}

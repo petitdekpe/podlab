@@ -11,16 +11,15 @@ use Psr\Log\LoggerInterface;
 /**
  * Bilan des ventes des séances du 29 novembre, pour la page /ventes.
  *
- * Deux sources Tick Africa :
- * - GET /events/{id} (events:read) : places restantes de chaque billet, et
- *   la capacité ou le nombre vendu si Tick Africa les fournit ;
- * - GET /orders (orders:read) : les commandes, pour le rythme des ventes,
- *   la recette, le panier moyen et les paiements non aboutis.
+ * Deux notions à ne pas confondre, chacune avec son pourcentage :
+ * - tickets MIS EN VENTE (stock chez Tick Africa) : ventes = vendus ÷ mis en vente ;
+ * - CAPACITÉ de la salle (saisie dans /admin) : remplissage = vendus ÷ capacité.
+ * L'une ne remplace jamais l'autre : une valeur inconnue reste inconnue.
  *
- * Places vendues = champ « vendu » du billet, sinon capacité − restantes,
- * sinon billets des commandes payées. Places totales = capacité de la salle
- * saisie dans /admin, sinon stock du billet (capacité Tick Africa, ou vendues
- * + restantes). Le bilan est gardé 60 s en cache.
+ * Sources : GET /events/{id} (events:read) pour le stock de chaque billet,
+ * GET /orders (orders:read) pour les commandes payées. Vendus = champ « vendu »
+ * du billet, sinon total − restants, sinon billets des commandes payées. Mis en
+ * vente = total du billet, sinon vendus + restants. Bilan gardé 60 s en cache.
  */
 final class Ventes
 {
@@ -28,18 +27,16 @@ final class Ventes
     public const SEANCES = ['marina-28', 'wologuede-28'];
 
     public const TIMEZONE = 'Africa/Porto-Novo';
-    private const CACHE_KEY = 'ventes.rapport';
+    private const CACHE_KEY = 'ventes.rapport.v2';
     private const TTL = 60;
     private const PER_PAGE = 100;
     private const MAX_PAGES = 50;
-    private const JOURS_GRAPHIQUE = 14;
-    private const SOURCE_SITE = 'podlab.beninbouge.com';
 
     private const PAYEES = ['validated', 'paid', 'completed', 'complete', 'confirmed', 'success', 'succeeded', 'approved'];
-    private const EN_ATTENTE = ['pending', 'processing', 'awaiting_payment', 'created', 'initiated', 'in_progress'];
 
     private const CHAMPS_VENDUS = ['sold_quantity', 'quantity_sold', 'sold', 'sold_count', 'tickets_sold', 'sales_count'];
-    private const CHAMPS_CAPACITE = ['total_quantity', 'quantity_total', 'initial_quantity', 'capacity', 'quantity', 'stock', 'max_quantity'];
+    /** Total mis en vente. Ni « stock » (souvent le restant) ni « max_quantity » (souvent le maximum par commande). */
+    private const CHAMPS_MIS_EN_VENTE = ['total_quantity', 'quantity_total', 'initial_quantity', 'capacity', 'quantity'];
 
     public function __construct(
         private readonly TickAfrica $tickAfrica,
@@ -85,12 +82,8 @@ final class Ventes
             $ligne = [
                 'key' => $key,
                 'salle' => $seance?->salle['name'] ?? $key,
-                'sub' => $seance?->salle['sub'] ?? '',
-                'jour' => $seance?->jour() ?? '',
-                'heure' => $seance?->heure() ?? '',
                 'starts_at' => $seance?->startsAt->format('c'),
                 'event_id' => $eventId,
-                'event_name' => '',
                 'erreur' => null,
                 'produits' => [],
             ];
@@ -102,7 +95,6 @@ final class Ventes
             } else {
                 try {
                     $event = $this->tickAfrica->event($eventId);
-                    $ligne['event_name'] = (string) ($event['name'] ?? '');
                     $ligne['produits'] = self::produits($event, $productIds);
                     foreach ($ligne['produits'] as $p) {
                         $champsProduit += array_flip(array_keys($p));
@@ -130,7 +122,7 @@ final class Ventes
             } catch (TickAfricaUnavailable $e) {
                 $commandesOk = false;
                 $commandesErreur = 403 === $e->getCode()
-                    ? 'La clé Tick Africa n\'a pas la portée orders:read : rythme des ventes et recette réelle indisponibles.'
+                    ? 'La clé Tick Africa n\'a pas la portée orders:read : ventes récentes et recette réelle indisponibles.'
                     : 'Tick Africa n\'a pas renvoyé la liste des commandes.';
                 $this->logger->warning('Ventes : commandes illisibles ({message}).', ['message' => $e->getMessage()]);
                 break;
@@ -141,14 +133,15 @@ final class Ventes
         }
 
         // 3. Attribution des commandes aux séances
-        $parSeance = array_fill_keys(self::SEANCES, ['payees' => [], 'attente' => 0, 'annulees' => 0]);
+        $parSeance = array_fill_keys(self::SEANCES, []);
         $partageEvent = array_count_values(array_filter(array_column($lignes, 'event_id')));
         foreach ($commandes as $commande) {
-            $statut = strtolower((string) ($commande['status'] ?? ''));
+            if (!\in_array(strtolower((string) ($commande['status'] ?? '')), self::PAYEES, true)) {
+                continue;
+            }
             $eventCommande = self::eventId($commande);
             $items = self::items($commande);
-            $source = (string) (($commande['metadata'] ?? [])['source'] ?? '');
-            $date = self::date($commande, $statut, $tz);
+            $date = self::date($commande, $tz);
 
             foreach ($lignes as $key => $ligne) {
                 if ('' !== $eventCommande && '' !== $ligne['event_id'] && $eventCommande !== $ligne['event_id']) {
@@ -181,24 +174,12 @@ final class Ventes
                 if (0 === $billets) {
                     continue;
                 }
-                if (\in_array($statut, self::PAYEES, true)) {
-                    // Lignes sans prix : montant de la commande, si elle ne porte que cette séance
-                    $total = self::montant($commande);
-                    if ($recette <= 0 && null !== $total && $retenus === \count($identifies)) {
-                        $recette = $total;
-                    }
-                    $parSeance[$key]['payees'][] = [
-                        'billets' => $billets,
-                        'recette' => $recette,
-                        'date' => $date?->format('c'),
-                        'site' => self::SOURCE_SITE === $source,
-                        'tarifs' => $parTarif,
-                    ];
-                } elseif (\in_array($statut, self::EN_ATTENTE, true)) {
-                    ++$parSeance[$key]['attente'];
-                } else {
-                    ++$parSeance[$key]['annulees'];
+                // Lignes sans prix : montant de la commande, si elle ne porte que cette séance
+                $total = self::montant($commande);
+                if ($recette <= 0 && null !== $total && $retenus === \count($identifies)) {
+                    $recette = $total;
                 }
+                $parSeance[$key][] = ['billets' => $billets, 'recette' => $recette, 'date' => $date, 'tarifs' => $parTarif];
             }
         }
 
@@ -212,7 +193,6 @@ final class Ventes
             'at' => $now->format('c'),
             'seances' => $resultat,
             'global' => self::global($resultat),
-            'jours' => self::jours($resultat, $now, $tz),
             'commandes_ok' => $commandesOk,
             'commandes_erreur' => $commandesErreur,
             'configure' => $configure,
@@ -225,140 +205,108 @@ final class Ventes
     }
 
     /**
-     * @param array<string, mixed>                                                       $ligne
-     * @param array{payees: list<array<string, mixed>>, attente: int, annulees: int}     $ventes
+     * @param array<string, mixed>       $ligne
+     * @param list<array<string, mixed>> $payees commandes payées de la séance
      *
      * @return array<string, mixed>
      */
-    private function chiffres(array $ligne, array $ventes, bool $commandesOk, \DateTimeImmutable $now): array
+    private function chiffres(array $ligne, array $payees, bool $commandesOk, \DateTimeImmutable $now): array
     {
-        $billetsCommandes = array_sum(array_column($ventes['payees'], 'billets'));
-        $recetteCommandes = array_sum(array_column($ventes['payees'], 'recette'));
+        $billetsCommandes = array_sum(array_column($payees, 'billets'));
+        $recetteCommandes = array_sum(array_column($payees, 'recette'));
         $parTarif = [];
-        foreach ($ventes['payees'] as $v) {
+        foreach ($payees as $v) {
             foreach ($v['tarifs'] as $id => $n) {
                 $parTarif[$id] = ($parTarif[$id] ?? 0) + $n;
             }
         }
+        // Commandes sans détail des billets : répartition entre tarifs impossible
+        $detail = array_sum($parTarif) === $billetsCommandes;
 
         $tarifs = [];
         $source = null;
         foreach ($ligne['produits'] as $p) {
-            $restantes = isset($p['available_quantity']) && is_numeric($p['available_quantity']) ? max(0, (int) $p['available_quantity']) : null;
-            $capacite = self::nombre($p, self::CHAMPS_CAPACITE);
-            $vendues = self::nombre($p, self::CHAMPS_VENDUS);
-            $origine = null !== $vendues ? 'billetterie' : null;
-            if (null === $vendues && null !== $capacite && null !== $restantes) {
-                $vendues = max(0, $capacite - $restantes);
-                $origine = 'billetterie';
+            $aVendre = isset($p['available_quantity']) && is_numeric($p['available_quantity']) ? max(0, (int) $p['available_quantity']) : null;
+            $misEnVente = self::nombre($p, self::CHAMPS_MIS_EN_VENTE);
+            if (null !== $misEnVente && null !== $aVendre && $misEnVente < $aVendre) {
+                $misEnVente = null; // ce champ n'est pas le total mis en vente
             }
-            if (null === $vendues && $commandesOk) {
-                // Commandes sans détail des billets : on ne sait pas les répartir entre tarifs
-                $vendues = [] === $parTarif && 1 === \count($ligne['produits']) ? $billetsCommandes : ($parTarif[(string) $p['id']] ?? 0);
+            $vendus = self::nombre($p, self::CHAMPS_VENDUS);
+            $origine = 'billetterie';
+            if (null === $vendus && null !== $misEnVente && null !== $aVendre) {
+                $vendus = $misEnVente - $aVendre;
+            }
+            if (null === $vendus && $commandesOk) {
+                $vendus = match (true) {
+                    $detail => $parTarif[$p['id']] ?? 0,
+                    1 === \count($ligne['produits']) => $billetsCommandes,
+                    default => null,
+                };
                 $origine = 'commandes';
             }
-            $source ??= $origine;
-            $prix = (int) round((float) ($p['price'] ?? 0));
-            $total = $capacite ?? (null !== $vendues && null !== $restantes ? $vendues + $restantes : null);
+            if (null !== $vendus) {
+                $source ??= $origine;
+            }
 
             $tarifs[] = [
-                'nom' => trim((string) ($p['name'] ?? '')) ?: 'Billet',
-                'prix' => $prix,
-                'restantes' => $restantes,
-                'vendues' => $vendues,
-                'total' => $total,
-                'taux' => null !== $total && $total > 0 && null !== $vendues ? $vendues / $total : null,
-                'valeur' => null !== $vendues ? $vendues * $prix : null,
-                'en_vente' => (bool) ($p['is_available'] ?? false),
+                'vendus' => $vendus,
+                'mis_en_vente' => $misEnVente ?? (null !== $vendus && null !== $aVendre ? $vendus + $aVendre : null),
+                'valeur' => null !== $vendus ? $vendus * (int) round((float) ($p['price'] ?? 0)) : null,
             ];
         }
 
-        $somme = static fn (string $champ): ?int => [] === $tarifs || \in_array(null, array_column($tarifs, $champ), true) ? null : array_sum(array_column($tarifs, $champ));
-        $vendues = $somme('vendues');
-        $total = $somme('total');
-        $restantes = $somme('restantes');
-        $valeur = $somme('valeur');
+        $vendus = self::somme($tarifs, 'vendus');
 
-        // Capacité de la salle saisie dans /admin : elle remplace le stock de billets
-        // comme base du remplissage, des places restantes et de la projection.
-        // Le stock Tick Africa reste affiché à part (billets encore en vente).
-        $stock = $total;
-        $enVente = $restantes;
-        $capaciteSalle = $this->capaciteSalle($ligne['key']);
-        if (null !== $capaciteSalle) {
-            $total = $capaciteSalle;
-            $restantes = null !== $vendues ? max(0, $capaciteSalle - $vendues) : null;
-        }
+        // Recette : celle des commandes si elles expliquent tous les tickets vendus,
+        // sinon la valeur des tickets vendus au prix du billet
+        $recetteReelle = $commandesOk && null !== $vendus && $billetsCommandes === $vendus && $recetteCommandes > 0;
 
-        // Recette : celle des commandes si elles expliquent toutes les places vendues,
-        // sinon la valeur des places vendues au prix du billet
-        $recetteReelle = $commandesOk && null !== $vendues && $billetsCommandes === $vendues && $recetteCommandes > 0;
-        $recette = $recetteReelle ? (int) round($recetteCommandes) : $valeur;
-
-        $debut = null !== $ligne['starts_at'] ? new \DateTimeImmutable($ligne['starts_at']) : null;
-        $joursRestants = null !== $debut && $debut > $now ? ($debut->getTimestamp() - $now->getTimestamp()) / 86400 : 0.0;
-
-        // Rythme, d'après les dates des commandes payées
-        $datees = array_values(array_filter($ventes['payees'], static fn (array $v): bool => null !== $v['date']));
-        $depuis = static fn (string $intervalle): int => array_sum(array_map(
-            static fn (array $v): int => new \DateTimeImmutable($v['date']) >= $now->modify($intervalle) ? $v['billets'] : 0,
-            $datees,
-        ));
-        $h24 = $depuis('-24 hours');
-        $j7 = $depuis('-7 days');
-        $premiere = [] === $datees ? null : min(array_map(static fn (array $v): string => (new \DateTimeImmutable($v['date']))->format('c'), $datees));
-        $joursDeVente = null !== $premiere ? max(1.0, ($now->getTimestamp() - (new \DateTimeImmutable($premiere))->getTimestamp()) / 86400) : null;
-        // Moyenne quotidienne sur les 7 derniers jours (ou depuis la première vente)
-        $parJour = null !== $joursDeVente ? $j7 / min(7.0, $joursDeVente) : null;
-
-        $projection = null;
-        if (null !== $parJour && null !== $vendues) {
-            $projection = (int) round($vendues + $parJour * $joursRestants);
-            if (null !== $total) {
-                $projection = min($total, $projection);
+        $h24 = 0;
+        foreach ($payees as $v) {
+            if (null !== $v['date'] && $v['date'] >= $now->modify('-24 hours')) {
+                $h24 += $v['billets'];
             }
         }
 
-        $nbPayees = \count($ventes['payees']);
-        $tentatives = $nbPayees + $ventes['annulees'];
+        $debut = null !== $ligne['starts_at'] ? new \DateTimeImmutable($ligne['starts_at']) : null;
 
         return [
-            'key' => $ligne['key'],
             'salle' => $ligne['salle'],
-            'sub' => $ligne['sub'],
-            'jour' => $ligne['jour'],
-            'heure' => $ligne['heure'],
-            'event_name' => $ligne['event_name'],
             'erreur' => $ligne['erreur'],
-            'tarifs' => $tarifs,
             'source' => $source,
-            'total' => $total,
-            'vendues' => $vendues,
-            'restantes' => $restantes,
-            'capacite_salle' => null !== $capaciteSalle,
-            'stock' => $stock,
-            'en_vente' => $enVente,
-            'illimite' => [] !== $tarifs && null === $restantes,
-            'taux' => null !== $total && $total > 0 && null !== $vendues ? $vendues / $total : null,
-            'recette' => $recette,
+            'recette' => $recetteReelle ? (int) round($recetteCommandes) : self::somme($tarifs, 'valeur'),
             'recette_reelle' => $recetteReelle,
-            'commandes' => $nbPayees,
-            'en_attente' => $ventes['attente'],
-            'annulees' => $ventes['annulees'],
-            'taux_paiement' => $tentatives > 0 ? $nbPayees / $tentatives : null,
-            'panier' => $nbPayees > 0 ? $billetsCommandes / $nbPayees : null,
-            'panier_recette' => $nbPayees > 0 ? $recetteCommandes / $nbPayees : null,
-            'billets_commandes' => $billetsCommandes,
-            'billets_site' => array_sum(array_map(static fn (array $v): int => $v['site'] ? $v['billets'] : 0, $ventes['payees'])),
             'h24' => $h24,
-            'j7' => $j7,
-            'par_jour' => $parJour,
-            'jours_restants' => $joursRestants,
-            'besoin_par_jour' => null !== $restantes && $joursRestants > 0 ? $restantes / max(1.0, $joursRestants) : null,
-            'projection' => $projection,
-            'premiere_vente' => $premiere,
-            'ventes' => array_map(static fn (array $v): array => ['billets' => $v['billets'], 'date' => $v['date']], $datees),
+            'jours_restants' => null !== $debut && $debut > $now ? ($debut->getTimestamp() - $now->getTimestamp()) / 86400 : 0.0,
+        ] + self::taux($vendus, self::somme($tarifs, 'mis_en_vente'), $this->capaciteSalle($ligne['key']));
+    }
+
+    /**
+     * Les deux pourcentages de la page, calculés au même endroit pour chaque séance et le total.
+     *
+     * @return array{vendus: int|null, mis_en_vente: int|null, capacite: int|null, taux_ventes: float|null, taux_remplissage: float|null}
+     */
+    private static function taux(?int $vendus, ?int $misEnVente, ?int $capacite): array
+    {
+        return [
+            'vendus' => $vendus,
+            'mis_en_vente' => $misEnVente,
+            'capacite' => $capacite,
+            'taux_ventes' => null !== $vendus && $misEnVente > 0 ? $vendus / $misEnVente : null,
+            'taux_remplissage' => null !== $vendus && $capacite > 0 ? $vendus / $capacite : null,
         ];
+    }
+
+    /**
+     * Somme d'une colonne ; null dès qu'une valeur est inconnue (pas de total partiel).
+     *
+     * @param array<array<string, mixed>> $lignes
+     */
+    private static function somme(array $lignes, string $champ): ?int
+    {
+        $valeurs = array_column($lignes, $champ);
+
+        return [] === $valeurs || \in_array(null, $valeurs, true) ? null : (int) array_sum($valeurs);
     }
 
     /** Capacité de la salle saisie dans /admin ; null si absente ou base injoignable. */
@@ -378,74 +326,12 @@ final class Ventes
      */
     private static function global(array $seances): array
     {
-        $somme = static function (string $champ) use ($seances): ?int {
-            $valeurs = array_column($seances, $champ);
-
-            return \in_array(null, $valeurs, true) ? null : (int) array_sum($valeurs);
-        };
-        $total = $somme('total');
-        $vendues = $somme('vendues');
-        $commandes = (int) array_sum(array_column($seances, 'commandes'));
-        $billetsCommandes = (int) array_sum(array_column($seances, 'billets_commandes'));
-        $tentatives = $commandes + (int) array_sum(array_column($seances, 'annulees'));
-        $parJour = array_column($seances, 'par_jour');
-
         return [
-            'total' => $total,
-            'vendues' => $vendues,
-            'restantes' => $somme('restantes'),
-            'en_vente' => $somme('en_vente'),
-            'capacite_salle' => [] !== $seances && !\in_array(false, array_column($seances, 'capacite_salle'), true),
-            'taux' => null !== $total && $total > 0 && null !== $vendues ? $vendues / $total : null,
-            'recette' => $somme('recette'),
-            'recette_reelle' => [] !== $seances && !\in_array(false, array_column($seances, 'recette_reelle'), true),
-            'commandes' => $commandes,
-            'en_attente' => (int) array_sum(array_column($seances, 'en_attente')),
-            'annulees' => (int) array_sum(array_column($seances, 'annulees')),
-            'taux_paiement' => $tentatives > 0 ? $commandes / $tentatives : null,
-            'panier' => $commandes > 0 ? $billetsCommandes / $commandes : null,
-            'billets_commandes' => $billetsCommandes,
-            'billets_site' => (int) array_sum(array_column($seances, 'billets_site')),
+            'recette' => self::somme($seances, 'recette'),
+            'recette_reelle' => !\in_array(false, array_column($seances, 'recette_reelle'), true),
             'h24' => (int) array_sum(array_column($seances, 'h24')),
-            'j7' => (int) array_sum(array_column($seances, 'j7')),
-            'par_jour' => \in_array(null, $parJour, true) || [] === $parJour ? null : array_sum($parJour),
-            'projection' => $somme('projection'),
             'jours_restants' => max([0.0, ...array_column($seances, 'jours_restants')]),
-        ];
-    }
-
-    /**
-     * Billets payés par jour (heure du Bénin), sur les 14 derniers jours au plus.
-     *
-     * @param array<string, array<string, mixed>> $seances
-     *
-     * @return list<array<string, mixed>>
-     */
-    private static function jours(array $seances, \DateTimeImmutable $now, \DateTimeZone $tz): array
-    {
-        $aujourdhui = $now->setTimezone($tz)->setTime(0, 0);
-        $premieres = array_filter(array_column($seances, 'premiere_vente'));
-        if ([] === $premieres) {
-            return [];
-        }
-        $debut = (new \DateTimeImmutable(min($premieres)))->setTimezone($tz)->setTime(0, 0);
-        $debut = max($debut, $aujourdhui->modify('-'.(self::JOURS_GRAPHIQUE - 1).' days'));
-
-        $jours = [];
-        for ($d = $debut; $d <= $aujourdhui; $d = $d->modify('+1 day')) {
-            $jours[$d->format('Y-m-d')] = ['date' => $d->format('Y-m-d'), 'label' => self::jourCourt($d), 'total' => 0] + array_fill_keys(array_keys($seances), 0);
-        }
-        foreach ($seances as $key => $seance) {
-            foreach ($seance['ventes'] as $v) {
-                $jour = (new \DateTimeImmutable($v['date']))->setTimezone($tz)->format('Y-m-d');
-                if (isset($jours[$jour])) {
-                    $jours[$jour][$key] += $v['billets'];
-                    $jours[$jour]['total'] += $v['billets'];
-                }
-            }
-        }
-
-        return array_values($jours);
+        ] + self::taux(self::somme($seances, 'vendus'), self::somme($seances, 'mis_en_vente'), self::somme($seances, 'capacite'));
     }
 
     /**
@@ -587,12 +473,9 @@ final class Ventes
     }
 
     /** @param array<string, mixed> $commande */
-    private static function date(array $commande, string $statut, \DateTimeZone $tz): ?\DateTimeImmutable
+    private static function date(array $commande, \DateTimeZone $tz): ?\DateTimeImmutable
     {
-        $champs = \in_array($statut, self::PAYEES, true)
-            ? ['paid_at', 'validated_at', 'completed_at', 'confirmed_at', 'created_at', 'date']
-            : ['created_at', 'date'];
-        foreach ($champs as $champ) {
+        foreach (['paid_at', 'validated_at', 'completed_at', 'confirmed_at', 'created_at', 'date'] as $champ) {
             $valeur = $commande[$champ] ?? null;
             if (\is_string($valeur) && '' !== $valeur) {
                 try {
@@ -630,12 +513,5 @@ final class Ventes
         }
 
         return 0.0;
-    }
-
-    private static function jourCourt(\DateTimeImmutable $d): string
-    {
-        $jours = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
-
-        return $jours[(int) $d->format('w')].' '.$d->format('j');
     }
 }

@@ -9,6 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -49,7 +50,7 @@ final class VentesTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('input[name="code"]');
-        self::assertSelectorNotExists('.vt-hero');
+        self::assertSelectorNotExists('.vt-bloc');
 
         $client->submitForm('Voir les ventes', ['code' => '0000']);
         self::assertResponseStatusCodeSame(401);
@@ -67,23 +68,45 @@ final class VentesTest extends WebTestCase
         self::assertSame('summary_large_image', $crawler->filter('meta[name="twitter:card"]')->attr('content'));
     }
 
-    public function testStatsUseHallCapacityWhenSet(): void
+    public function testSalesAndFillingAreTwoDifferentRates(): void
     {
-        $client = $this->client(['capacite_marina-28' => '200', 'capacite_wologuede-28' => '100']);
-        $client->request('GET', '/ventes');
-        $client->submitForm('Voir les ventes', ['code' => '1003']);
-        $crawler = $client->followRedirect();
+        $crawler = $this->bilan($this->client(['capacite_marina-28' => '200', 'capacite_wologuede-28' => '100']));
 
-        // 7 + 3 vendues sur 200 + 100 places dans les salles (et non 100 + 50 billets en vente)
-        self::assertSame('10 / 300', preg_replace('/\s+/u', ' ', trim($crawler->filter('.vt-hero__big')->text())));
-        self::assertStringContainsString('290 places restantes', $crawler->filter('.vt-hero__main')->text());
-        self::assertSame(['4 %', '3 %'], $crawler->filter('.vt-seance__big')->each(fn ($n) => trim(explode(' rempli', $n->text())[0])));
+        self::assertSame([
+            // vendus, ventes (sur les tickets mis en vente), remplissage (sur la capacité)
+            ['10 tickets vendus', 'Ventes 6,7 % sur 150 tickets mis en vente', 'Remplissage 3,3 % sur 300 places au total'],
+            ['7 vendus', 'Ventes 7 % sur 100 tickets mis en vente', 'Remplissage 3,5 % sur 200 places au total'],
+            ['3 vendus', 'Ventes 6 % sur 50 tickets mis en vente', 'Remplissage 3 % sur 100 places au total'],
+        ], $this->blocs($crawler));
+        // Recette : 7 × 10 000 + 3 × 8 000 (commandes payées seulement)
+        self::assertStringContainsString('94 000 F', $crawler->filter('.vt-infos')->text());
+        self::assertStringContainsString('commandes payées', $crawler->filter('.vt-infos')->text());
+    }
 
-        $marina = $crawler->filter('.vt-seance')->first();
-        self::assertStringContainsString('Capacité salle', $marina->filter('.vt-stats')->text());
-        self::assertStringContainsString('193', $marina->filter('.vt-stats')->text());
-        self::assertStringContainsString('dont 93 en vente', $marina->filter('.vt-stats')->text());
-        self::assertStringContainsString('Part de la salle', $marina->filter('.vt-table')->text());
+    public function testFillingIsUnknownWithoutCapacity(): void
+    {
+        // Une seule capacité saisie : jamais remplacée par les tickets mis en vente, pas de total partiel
+        $blocs = $this->blocs($this->bilan($this->client(['capacite_marina-28' => '200'])));
+
+        self::assertSame('Remplissage — capacité à saisir dans /admin', $blocs[0][2]);
+        self::assertSame('Remplissage 3,5 % sur 200 places au total', $blocs[1][2]);
+        self::assertSame('Remplissage — capacité à saisir dans /admin', $blocs[2][2]);
+        self::assertSame('Ventes 6,7 % sur 150 tickets mis en vente', $blocs[0][1]);
+    }
+
+    public function testAmbiguousFieldsAreNotTakenForTheTicketsOnSale(): void
+    {
+        // Maximum par commande, stock restant, ou total plus petit que le restant
+        $blocs = $this->blocs($this->bilan($this->client([], ['max_quantity' => 10, 'stock' => 93, 'quantity' => 5])));
+
+        self::assertSame(['7 vendus', 'Ventes 7 % sur 100 tickets mis en vente'], \array_slice($blocs[1], 0, 2));
+    }
+
+    public function testMoreTicketsThanSeatsIsReported(): void
+    {
+        $crawler = $this->bilan($this->client(['capacite_marina-28' => '80', 'capacite_wologuede-28' => '100']));
+
+        self::assertStringContainsString('100 tickets mis en vente pour 80 places', $crawler->filter('.adm-main')->text());
     }
 
     public function testDashboardWithRightCode(): void
@@ -92,28 +115,39 @@ final class VentesTest extends WebTestCase
         $client->request('GET', '/ventes');
         $client->submitForm('Voir les ventes', ['code' => '1003']);
         self::assertResponseRedirects('/ventes');
-        $crawler = $client->followRedirect();
+        $client->followRedirect();
 
         self::assertResponseIsSuccessful();
         self::assertSame('noindex, nofollow', $client->getResponse()->headers->get('X-Robots-Tag'));
-
-        // Marina : 7 vendues (2 commandes payées) + 93 restantes ; Wologuèdè : 3 vendues + 47 restantes
-        self::assertSame('10 / 150', preg_replace('/\s+/u', ' ', trim($crawler->filter('.vt-hero__big')->text())));
-        self::assertStringContainsString('140 places restantes', $crawler->filter('.vt-hero__main')->text());
-        // Recette : 7 × 10 000 + 3 × 8 000
-        self::assertStringContainsString('94 000 F', $crawler->filter('.vt-kpis')->text());
-        // Tickets vendus par séance, juste sous le total
-        self::assertSame(['7', '3'], $crawler->filter('.vt-hero .vt-par__big')->each(fn ($n) => trim($n->text())));
-        self::assertSame(['7 %', '6 %'], $crawler->filter('.vt-seance__big')->each(fn ($n) => trim(explode(' rempli', $n->text())[0])));
-        // Une commande en attente, une annulée : 3 payées sur 4 tentatives
-        self::assertStringContainsString('75 %', $crawler->filter('.vt-kpis')->text());
-        self::assertGreaterThan(0, $crawler->filter('.vt-col')->count());
-
         self::assertContains('GET /orders event_id='.self::MARINA, $this->urls);
     }
 
-    /** @param array<string, string>|null $settings réglages de /admin simulés (null : base absente) */
-    private function client(?array $settings = null): KernelBrowser
+    private function bilan(KernelBrowser $client): Crawler
+    {
+        $client->request('GET', '/ventes');
+        $client->submitForm('Voir les ventes', ['code' => '1003']);
+        $crawler = $client->followRedirect();
+        self::assertResponseIsSuccessful();
+
+        return $crawler;
+    }
+
+    /** @return list<list<string>> pour chaque bloc : vendus, ventes, remplissage */
+    private function blocs(Crawler $crawler): array
+    {
+        $texte = static fn (Crawler $n): string => trim(preg_replace('/\s+/u', ' ', $n->text()));
+
+        return $crawler->filter('.vt-bloc')->each(static fn (Crawler $b): array => [
+            $texte($b->filter('.vt-bloc__big')),
+            ...$b->filter('.vt-jauge')->each($texte),
+        ]);
+    }
+
+    /**
+     * @param array<string, string>|null $settings réglages de /admin simulés (null : base absente)
+     * @param array<string, int>         $champs   champs ajoutés aux billets
+     */
+    private function client(?array $settings = null, array $champs = []): KernelBrowser
     {
         $client = static::createClient();
         $client->disableReboot();
@@ -132,7 +166,7 @@ final class VentesTest extends WebTestCase
 
         $event = fn (string $tarif, string $nom, string $prix, int $restantes): string => json_encode(['success' => true, 'data' => [
             'id' => 'x', 'name' => $nom, 'is_on_sale' => true, 'sellable_via_api' => true,
-            'products' => [['id' => $tarif, 'name' => $nom, 'type' => 'ticket', 'price' => $prix, 'available_quantity' => $restantes, 'is_available' => true]],
+            'products' => [['id' => $tarif, 'name' => $nom, 'type' => 'ticket', 'price' => $prix, 'available_quantity' => $restantes, 'is_available' => true] + $champs],
         ]]);
         $commande = fn (string $id, string $statut, string $event, string $tarif, int $qte, int $prix, string $il_y_a, string $source = 'podlab.beninbouge.com'): array => [
             'id' => $id, 'status' => $statut, 'event_id' => $event,

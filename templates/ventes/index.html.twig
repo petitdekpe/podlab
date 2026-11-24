@@ -1,15 +1,37 @@
 {% extends 'base.html.twig' %}
 
 {% macro n(v) %}{{ v is null ? '—' : v|number_format(0, ',', ' ') }}{% endmacro %}
-{% macro pct(v) %}{{ v is null ? '—' : (v * 100)|number_format(v < 0.01 and v > 0 ? 1 : 0, ',', ' ') ~ ' %' }}{% endmacro %}
-{% macro fcfa(v) %}{{ v is null ? '—' : v|number_format(0, ',', ' ') ~ ' F' }}{% endmacro %}
-{% macro dec(v) %}{{ v is null ? '—' : v|number_format(v < 10 ? 1 : 0, ',', ' ') }}{% endmacro %}
+{% macro pct(v) %}{% if v is null %}—{% else %}{% set p = (v * 100)|round(1) %}{{ p|number_format(p == p|round ? 0 : 1, ',', ' ') }} %{% endif %}{% endmacro %}
+
+{# Une jauge : nom, pourcentage, barre, et sur combien il est calculé.
+   segments : liste de {c: couleur, v: tickets vendus} #}
+{% macro jauge(nom, taux, base, libelle, inconnu, segments) %}
+    {% import _self as f %}
+    <div class="vt-jauge">
+        <p class="vt-jauge__head"><span class="vt-jauge__name">{{ nom }}</span> <span class="vt-jauge__pct">{{ f.pct(taux) }}</span></p>
+        <div class="vt-fill" aria-hidden="true">
+            {% if taux is not null %}
+                {% for s in segments|filter(s => s.v > 0) %}<span class="vt-fill__seg vt-s{{ s.c }}" style="width: {{ (s.v / base * 100)|round(2) }}%"></span>{% endfor %}
+            {% endif %}
+        </div>
+        <p class="vt-jauge__base">{% if base is null %}{{ inconnu }}{% else %}sur {{ f.n(base) }} {{ libelle }}{% endif %}</p>
+    </div>
+{% endmacro %}
+
+{# Les deux mêmes jauges pour le total et pour chaque séance #}
+{% macro jauges(b, segments) %}
+    {% import _self as f %}
+    <div class="vt-jauges">
+        {{ f.jauge('Ventes', b.taux_ventes, b.mis_en_vente, 'tickets mis en vente', 'tickets mis en vente : inconnu', segments) }}
+        {{ f.jauge('Remplissage', b.taux_remplissage, b.capacite, 'places au total', 'capacité à saisir dans /admin', segments) }}
+    </div>
+{% endmacro %}
 
 {% block title %}Ventes du 29 novembre · Podlab × Bénin Bouge{% endblock %}
 
 {% block meta %}
     <meta name="robots" content="noindex, nofollow">
-    <meta http-equiv="refresh" content="120">
+    <meta http-equiv="refresh" content="120;url={{ path('app_ventes') }}">
     {{ include('ventes/_apercu.html.twig') }}
 {% endblock %}
 
@@ -33,7 +55,7 @@
         </div>
     </header>
 
-    <main class="adm-main vt">
+    <main class="adm-main">
         <div class="vt-title">
             <h1 class="adm-h1">Dimanche 29 novembre · 13h00</h1>
             <p class="adm-muted">
@@ -42,238 +64,56 @@
             </p>
         </div>
 
-        {# --- Tickets vendus : ce qu'on voit en premier --------------------- #}
-        <section class="vt-hero adm-card" aria-labelledby="vt-total">
-            <div class="vt-hero__main">
-                <p class="adm-card__label" id="vt-total">Tickets vendus · total</p>
-                <p class="vt-hero__big">
-                    {{ f.n(g.vendues) }}<span class="vt-hero__of"> / {{ f.n(g.total) }}</span>
-                </p>
-                <p class="vt-hero__sub">{{ f.pct(g.taux) }} de remplissage · {{ f.n(g.restantes) }} places restantes</p>
+        {% set tous = [] %}
+        {% for key, s in seances %}{% set tous = tous|merge([{c: couleurs[key], v: s.vendus}]) %}{% endfor %}
 
-                {% if g.total %}
-                    <div class="vt-fill vt-fill--big" role="img" aria-label="Remplissage global : {{ f.pct(g.taux) }}">
-                        {% for key, s in seances %}
-                            {% if s.vendues %}
-                                <span class="vt-fill__seg vt-s{{ couleurs[key] }}" style="width: {{ (s.vendues / g.total * 100)|round(2) }}%" title="{{ s.salle }} : {{ f.n(s.vendues) }} vendus"></span>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            </div>
+        <div class="vt-blocs">
+            <section class="adm-card vt-bloc vt-bloc--total">
+                <h2 class="vt-bloc__name">Total des deux séances</h2>
+                <p class="vt-bloc__big">{{ f.n(g.vendus) }} <span class="vt-bloc__unit">tickets vendus</span></p>
+                {{ f.jauges(g, tous) }}
+            </section>
 
-            <ul class="vt-par" aria-label="Tickets vendus par séance">
-                {% for key, s in seances %}
-                    <li class="vt-par__item">
-                        <p class="vt-par__name"><span class="vt-dot vt-s{{ couleurs[key] }}" aria-hidden="true"></span>{{ s.salle|replace({'Majestic ': ''}) }}</p>
-                        <p class="vt-par__big">{{ f.n(s.vendues) }}</p>
-                        <p class="vt-par__sub">sur {{ s.illimite ? '∞' : f.n(s.total) }} · {{ f.pct(s.taux) }}</p>
-                        <div class="vt-fill" aria-hidden="true">
-                            {% if s.total and s.vendues %}
-                                <span class="vt-fill__seg vt-s{{ couleurs[key] }}" style="width: {{ (s.vendues / s.total * 100)|round(2) }}%"></span>
-                            {% endif %}
-                        </div>
-                        {% if r.commandes_ok %}<p class="vt-par__sub">+{{ f.n(s.h24) }} en 24 h</p>{% endif %}
-                    </li>
-                {% endfor %}
-            </ul>
-        </section>
+            {% for key, s in seances %}
+                <section class="adm-card vt-bloc">
+                    <h2 class="vt-bloc__name"><span class="vt-dot vt-s{{ couleurs[key] }}" aria-hidden="true"></span>{{ s.salle|replace({'Majestic ': ''}) }}</h2>
+                    <p class="vt-bloc__big">{{ f.n(s.vendus) }} <span class="vt-bloc__unit">vendus</span></p>
+                    {{ f.jauges(s, [{c: couleurs[key], v: s.vendus}]) }}
+                </section>
+            {% endfor %}
+        </div>
 
         {% if not r.configure %}
             <p class="adm-alert adm-alert--error" role="alert">Aucune clé API Tick Africa : renseignez-la dans /admin › Paramètres.</p>
-        {% endif %}
-        {% if r.test %}
-            <p class="adm-alert adm-alert--error" role="alert">Clé Tick Africa de <strong>test</strong> : ces chiffres ne sont pas ceux des vraies ventes.</p>
-        {% endif %}
-        {% for s in seances|filter(s => s.erreur) %}
-            <p class="adm-alert adm-alert--error" role="alert">{{ s.salle }} : {{ s.erreur }}</p>
-        {% endfor %}
-        {% if r.configure and not r.commandes_ok %}
-            <p class="adm-alert adm-alert--error" role="alert">{{ r.commandes_erreur ?? 'Commandes indisponibles.' }} Les places vendues viennent alors des stocks Tick Africa uniquement.</p>
-        {% endif %}
-
-        {# --- Performance --------------------------------------------------- #}
-        <section class="adm-card" aria-label="Performance">
-            <dl class="vt-kpis">
-                <div>
-                    <dt>Recette</dt>
-                    <dd>{{ f.fcfa(g.recette) }}</dd>
-                    <dd class="vt-kpis__note">{{ g.recette_reelle ? 'encaissée (commandes payées)' : 'estimée : places vendues × prix' }}</dd>
-                </div>
-                <div>
-                    <dt>Dernières 24 h</dt>
-                    <dd>{{ r.commandes_ok ? '+' ~ f.n(g.h24) : '—' }}</dd>
-                    <dd class="vt-kpis__note">places vendues</dd>
-                </div>
-                <div>
-                    <dt>7 derniers jours</dt>
-                    <dd>{{ r.commandes_ok ? '+' ~ f.n(g.j7) : '—' }}</dd>
-                    <dd class="vt-kpis__note">{{ f.dec(g.par_jour) }} places / jour en moyenne</dd>
-                </div>
-                <div>
-                    <dt>Projection au 29</dt>
-                    <dd>{{ f.n(g.projection) }}</dd>
-                    <dd class="vt-kpis__note">{% if g.projection is not null and g.total %}{{ f.pct(g.projection / g.total) }} si le rythme actuel se maintient{% else %}au rythme des 7 derniers jours{% endif %}</dd>
-                </div>
-                <div>
-                    <dt>Commandes payées</dt>
-                    <dd>{{ r.commandes_ok ? f.n(g.commandes) : '—' }}</dd>
-                    <dd class="vt-kpis__note">{{ f.dec(g.panier) }} places par commande</dd>
-                </div>
-                <div>
-                    <dt>Paiements aboutis</dt>
-                    <dd>{{ f.pct(g.taux_paiement) }}</dd>
-                    <dd class="vt-kpis__note">{{ f.n(g.annulees) }} échoué(s) ou annulé(s) · {{ f.n(g.en_attente) }} en attente</dd>
-                </div>
-            </dl>
-        </section>
-
-        {# --- Par séance ---------------------------------------------------- #}
-        <section class="vt-seances" aria-label="Détail par séance">
-            {% for key, s in seances %}
-                <article class="adm-card vt-seance">
-                    <header class="vt-seance__head">
-                        <span class="vt-dot vt-s{{ couleurs[key] }}" aria-hidden="true"></span>
-                        <div>
-                            <h2 class="adm-h2">{{ s.salle }}</h2>
-                            <p class="adm-muted">{{ s.sub }} · {{ s.jour }} · {{ s.heure }}</p>
-                        </div>
-                    </header>
-
-                    <p class="vt-seance__big">{{ f.pct(s.taux) }} <span class="adm-muted">rempli</span></p>
-                    <div class="vt-fill" role="img" aria-label="{{ s.salle }} : {{ f.n(s.vendues) }} places vendues sur {{ f.n(s.total) }}">
-                        {% if s.total and s.vendues %}
-                            <span class="vt-fill__seg vt-s{{ couleurs[key] }}" style="width: {{ (s.vendues / s.total * 100)|round(2) }}%"></span>
-                        {% endif %}
-                    </div>
-
-                    <dl class="vt-stats">
-                        <div><dt>{{ s.capacite_salle ? 'Capacité salle' : 'Places totales' }}</dt><dd>{{ s.illimite ? 'illimité' : f.n(s.total) }}</dd></div>
-                        <div><dt>Vendues</dt><dd>{{ f.n(s.vendues) }}</dd></div>
-                        <div>
-                            <dt>Restantes</dt>
-                            <dd>{{ s.illimite ? 'illimité' : f.n(s.restantes) }}</dd>
-                            {% if s.capacite_salle and s.en_vente is not null and s.en_vente != s.restantes %}
-                                <dd class="vt-kpis__note">dont {{ f.n(s.en_vente) }} en vente</dd>
-                            {% endif %}
-                        </div>
-                        <div><dt>Recette{{ s.recette_reelle ? '' : ' (est.)' }}</dt><dd>{{ f.fcfa(s.recette) }}</dd></div>
-                        <div><dt>Ventes 24 h</dt><dd>{{ r.commandes_ok ? '+' ~ f.n(s.h24) : '—' }}</dd></div>
-                        <div><dt>Ventes 7 jours</dt><dd>{{ r.commandes_ok ? '+' ~ f.n(s.j7) : '—' }}</dd></div>
-                        <div><dt>Rythme actuel</dt><dd>{{ f.dec(s.par_jour) }} / jour</dd></div>
-                        <div><dt>Pour faire complet</dt><dd>{{ s.besoin_par_jour is null ? '—' : f.dec(s.besoin_par_jour) ~ ' / jour' }}</dd></div>
-                        <div><dt>Projection au 29</dt><dd>{{ f.n(s.projection) }}</dd></div>
-                        <div><dt>Commandes payées</dt><dd>{{ r.commandes_ok ? f.n(s.commandes) : '—' }}</dd></div>
-                        <div><dt>Panier moyen</dt><dd>{{ s.panier is null ? '—' : f.dec(s.panier) ~ ' pl. · ' ~ f.fcfa(s.panier_recette) }}</dd></div>
-                        <div><dt>Vendues via le site</dt><dd>{{ r.commandes_ok and s.billets_commandes ? f.pct(s.billets_site / s.billets_commandes) : '—' }}</dd></div>
-                    </dl>
-
-                    {% if s.besoin_par_jour is not null and s.par_jour is not null and s.restantes > 0 %}
-                        <p class="vt-verdict {{ s.par_jour >= s.besoin_par_jour ? 'vt-verdict--ok' : 'vt-verdict--warn' }}">
-                            {% if s.par_jour >= s.besoin_par_jour %}
-                                ✓ Au rythme actuel, la séance sera complète avant le 29.
-                            {% else %}
-                                ! Il faut {{ f.dec(s.besoin_par_jour) }} places par jour pour faire complet ; le rythme actuel est de {{ f.dec(s.par_jour) }}.
-                            {% endif %}
-                        </p>
-                    {% elseif s.restantes is same as(0) and s.total %}
-                        <p class="vt-verdict vt-verdict--ok">✓ Complet.</p>
-                    {% endif %}
-
-                    {% if s.tarifs|length > 0 %}
-                        <div class="adm-tablewrap">
-                            <table class="adm-table vt-table">
-                                {% if s.capacite_salle %}
-                                    {# Rapporté à la salle : part de la capacité occupée par chaque billet #}
-                                    <thead><tr><th>Billet</th><th>Prix</th><th>Vendues</th><th>En vente</th><th>Part de la salle</th></tr></thead>
-                                {% else %}
-                                    <thead><tr><th>Billet</th><th>Prix</th><th>Vendues</th><th>Restantes</th><th>Remplissage</th></tr></thead>
-                                {% endif %}
-                                <tbody>
-                                    {% for t in s.tarifs %}
-                                        <tr>
-                                            <td data-label="Billet">{{ t.nom }}{% if not t.en_vente %} <span class="adm-tag">hors vente</span>{% endif %}</td>
-                                            <td data-label="Prix">{{ f.fcfa(t.prix) }}</td>
-                                            {% if s.capacite_salle %}
-                                                <td data-label="Vendues">{{ f.n(t.vendues) }} / {{ f.n(s.total) }}</td>
-                                                <td data-label="En vente">{{ t.restantes is null ? 'illimité' : f.n(t.restantes) }}</td>
-                                                <td data-label="Part de la salle">{{ f.pct(t.vendues is null ? null : t.vendues / s.total) }}</td>
-                                            {% else %}
-                                                <td data-label="Vendues">{{ f.n(t.vendues) }}{% if t.total is not null %} / {{ f.n(t.total) }}{% endif %}</td>
-                                                <td data-label="Restantes">{{ t.restantes is null ? 'illimité' : f.n(t.restantes) }}</td>
-                                                <td data-label="Remplissage">{{ f.pct(t.taux) }}</td>
-                                            {% endif %}
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-                </article>
-            {% endfor %}
-        </section>
-
-        {# --- Ventes par jour ----------------------------------------------- #}
-        <section class="adm-card" aria-labelledby="vt-jours-title">
-            <h2 class="adm-h2" id="vt-jours-title">Places vendues par jour</h2>
-            {% if r.jours|length > 0 %}
-                {% set max = max(r.jours|map(j => j.total)|merge([1])) %}
-                <ul class="vt-legend">
-                    {% for key, s in seances %}
-                        <li><span class="vt-dot vt-s{{ couleurs[key] }}"></span>{{ s.salle }}</li>
-                    {% endfor %}
-                </ul>
-                <div class="vt-chart" role="group" aria-label="Places vendues par jour et par séance">
-                    <span class="vt-chart__max">{{ max }}</span>
-                    <div class="vt-chart__plot">
-                        {% for j in r.jours %}
-                            <div class="vt-col" tabindex="0" aria-label="{{ j.label }} : {{ j.total }} places">
-                                <div class="vt-col__bar">
-                                    {% for key, s in seances %}
-                                        {% if j[key] > 0 %}
-                                            <span class="vt-col__seg vt-s{{ couleurs[key] }}" style="height: {{ (j[key] / max * 100)|round(2) }}%"></span>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                                <span class="vt-col__label">{{ j.label }}</span>
-                                <span class="vt-tip" role="tooltip">
-                                    <strong>{{ j.label }} · {{ j.total }} place{{ j.total > 1 ? 's' }}</strong>
-                                    {% for key, s in seances %}
-                                        <span><i class="vt-dot vt-s{{ couleurs[key] }}"></i>{{ s.salle }} : {{ j[key] }}</span>
-                                    {% endfor %}
-                                </span>
-                            </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                <details class="vt-details">
-                    <summary>Voir le tableau</summary>
-                    <div class="adm-tablewrap">
-                        <table class="adm-table">
-                            <thead><tr><th>Jour</th>{% for s in seances %}<th>{{ s.salle }}</th>{% endfor %}<th>Total</th></tr></thead>
-                            <tbody>
-                                {% for j in r.jours|reverse %}
-                                    <tr><td data-label="Jour">{{ j.label }}</td>{% for key, s in seances %}<td data-label="{{ s.salle }}">{{ j[key] }}</td>{% endfor %}<td data-label="Total">{{ j.total }}</td></tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </details>
-            {% else %}
-                <p class="adm-muted">{{ r.commandes_ok ? 'Aucune commande payée pour le moment.' : 'Disponible quand la clé Tick Africa a la portée orders:read.' }}</p>
+        {% else %}
+            {% if r.test %}
+                <p class="adm-alert adm-alert--error" role="alert">Clé Tick Africa de <strong>test</strong> : ces chiffres ne sont pas ceux des vraies ventes.</p>
             {% endif %}
+            {% for s in seances|filter(s => s.erreur) %}
+                <p class="adm-alert adm-alert--error" role="alert">{{ s.salle }} : {{ s.erreur }}</p>
+            {% endfor %}
+            {% if not r.commandes_ok %}
+                <p class="adm-alert adm-alert--error" role="alert">{{ r.commandes_erreur ?? 'Commandes indisponibles.' }}</p>
+            {% endif %}
+        {% endif %}
+        {% for s in seances|filter(s => s.capacite and s.mis_en_vente > s.capacite) %}
+            <p class="adm-alert adm-alert--error" role="alert">{{ s.salle }} : {{ f.n(s.mis_en_vente) }} tickets mis en vente pour {{ f.n(s.capacite) }} places. Vérifiez la capacité dans /admin ou le stock chez Tick Africa.</p>
+        {% endfor %}
+
+        <section class="adm-card" aria-label="Recette et ventes récentes">
+            <dl class="vt-infos">
+                <div><dt>Recette {{ g.recette_reelle ? '(commandes payées)' : '(estimée)' }}</dt><dd>{{ f.n(g.recette) }}{{ g.recette is null ? '' : ' F' }}</dd></div>
+                <div><dt>Vendus ces dernières 24 h</dt><dd>{{ r.commandes_ok ? f.n(g.h24) : '—' }}</dd></div>
+            </dl>
         </section>
 
         <details class="vt-details adm-muted">
             <summary>Comment ces chiffres sont calculés</summary>
             <ul class="vt-notes">
-                <li>Places totales : capacité de la salle saisie dans /admin › Paramètres ; à défaut, stock du billet chez Tick Africa.
-                    {% for s in seances %}{{ s.salle }} : {{ s.capacite_salle ? 'capacité de la salle' : 'stock Tick Africa (capacité de la salle non renseignée)' }}{{ not loop.last ? ' ; ' }}{% endfor %}.</li>
-                <li>Places restantes : places totales − vendues. « En vente » : stock en temps réel de chaque billet chez Tick Africa (ventes du site et de tick.africa confondues).</li>
-                <li>Places vendues :
-                    {% for s in seances %}{{ s.salle }} : {{ s.source == 'billetterie' ? 'stock Tick Africa (capacité − restantes)' : (s.source == 'commandes' ? 'somme des commandes payées' : 'indisponible') }}{{ not loop.last ? ' ; ' }}{% endfor %}.</li>
-                <li>Rythme : moyenne des 7 derniers jours. Projection : places vendues + rythme × jours restants.</li>
-                <li>Les chiffres sont relus chez Tick Africa au plus toutes les 60 secondes.</li>
+                <li>Ventes = tickets vendus ÷ tickets mis en vente chez Tick Africa.</li>
+                <li>Remplissage = tickets vendus ÷ capacité de la salle, saisie dans /admin › Paramètres.</li>
+                <li>Tickets vendus, d'après :
+                    {% for s in seances %}{{ s.salle }}, {{ s.source == 'billetterie' ? 'le stock Tick Africa' : (s.source == 'commandes' ? 'les commandes payées' : 'indisponible') }}{{ not loop.last ? ' ; ' }}{% endfor %}.</li>
                 <li>Champs reçus de Tick Africa · billet : {{ r.champs.produit|join(', ') ?: '—' }} · commande : {{ r.champs.commande|join(', ') ?: '—' }}</li>
             </ul>
         </details>

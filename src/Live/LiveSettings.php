@@ -89,8 +89,8 @@ final class LiveSettings
 
     /**
      * Capacité totale de la salle pour une séance, saisie dans /admin ; null si
-     * non renseignée. Sert au bilan /ventes : le remplissage se calcule sur la
-     * salle entière et non sur les seuls billets mis en vente chez Tick Africa.
+     * non renseignée. Sert au pourcentage de remplissage du bilan /ventes, distinct
+     * du pourcentage des ventes (calculé sur les tickets mis en vente).
      */
     public function seanceCapacity(string $seance): ?int
     {

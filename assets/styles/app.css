@@ -2560,147 +2560,60 @@ html.is-modal-open { overflow: hidden; }
 .vt-top__refresh { margin-left: auto; }
 .vt-title .adm-muted { margin-top: 4px; }
 .vt-code { font-size: 22px; letter-spacing: 0.3em; text-align: center; }
-
 .vt-dot { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; }
-.vt-dot--empty { background: var(--vt-track); box-shadow: inset 0 0 0 1px var(--color-border-strong); }
 
-.vt-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 0; margin: 10px 0 0; list-style: none; font-size: 14px; color: var(--color-text-muted); }
-.vt-legend li { display: flex; align-items: center; gap: 8px; }
-.vt-legend strong { color: var(--color-text); }
+/* un bloc = tickets vendus + deux jauges ; le total, puis une séance par bloc */
+.vt-blocs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.vt-bloc { display: flex; flex-direction: column; min-width: 0; }
+.vt-bloc--total { grid-column: 1 / -1; }
+.vt-bloc__name { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; }
+.vt-bloc__big { margin-top: 6px; font-family: var(--font-display); font-size: 48px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.vt-bloc--total .vt-bloc__big { font-size: clamp(4rem, 9vw, 6rem); }
+.vt-bloc__unit { font-family: var(--font-body); font-size: 15px; font-weight: 400; letter-spacing: 0; color: var(--color-text-subtle); }
+.vt-jauges { display: grid; gap: 18px; margin-top: 18px; }
+.vt-bloc--total .vt-jauges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
 
-/* jauge de remplissage : segments séparés par 2px, extrémités arrondies */
-.vt-fill { display: flex; gap: 2px; height: 12px; margin-top: 14px; border-radius: 4px; background: var(--vt-track); overflow: hidden; }
-.vt-fill--big { height: 18px; }
+.vt-jauge__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 8px; }
+.vt-jauge__name { font-size: 15px; color: var(--color-text-muted); }
+.vt-jauge__pct { font-family: var(--font-display); font-size: 24px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vt-jauge__base { font-size: 14px; line-height: 1.4; color: var(--color-text-subtle); }
+.vt-fill { display: flex; gap: 2px; height: 12px; margin: 6px 0; border-radius: 4px; background: var(--vt-track); overflow: hidden; }
 .vt-fill__seg { display: block; height: 100%; min-width: 3px; }
 .vt-fill__seg:last-child { border-radius: 0 4px 4px 0; }
 
-/* bloc d'ouverture : tickets vendus au total, puis par séance */
-.vt-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: center; }
-.vt-hero__big { margin: 6px 0 4px; font-family: var(--font-display); font-size: clamp(4rem, 9vw, 6rem); font-weight: 800; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.vt-hero__of { font-size: 0.36em; color: var(--color-text-subtle); letter-spacing: 0; }
-.vt-hero__sub { color: var(--color-text-muted); }
+.vt-infos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; }
+.vt-infos dt { font-size: 14px; color: var(--color-text-subtle); }
+.vt-infos dd { margin: 2px 0 0; font-family: var(--font-display); font-size: 24px; font-weight: 700; line-height: 1.2; }
 
-.vt-par { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-.vt-par__item { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 18px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--color-surface-2); }
-.vt-par__item .vt-fill { margin: 8px 0 4px; height: 8px; }
-.vt-par__name { display: flex; align-items: center; gap: 8px; font-weight: 700; overflow-wrap: anywhere; }
-.vt-par__big { font-family: var(--font-display); font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.vt-par__sub { font-size: 14px; color: var(--color-text-subtle); }
-
-.vt-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; margin: 0; }
-.vt-kpis > div { padding-left: 14px; border-left: 1px solid var(--color-border); }
-.vt-kpis dt { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-subtle); }
-.vt-kpis dd { margin: 4px 0 0; font-family: var(--font-display); font-size: 26px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
-.vt-kpis dd.vt-kpis__note { margin-top: 2px; font-family: var(--font-body); font-size: 13px; font-weight: 400; color: var(--color-text-subtle); }
-
-.vt-seances { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 16px; }
-.vt-seance { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.vt-seance__head { display: flex; align-items: flex-start; gap: 12px; }
-.vt-seance__head .vt-dot { margin-top: 9px; width: 12px; height: 12px; }
-.vt-seance__head .adm-h2 { margin-bottom: 0; }
-.vt-seance__big { margin-top: 14px; font-family: var(--font-display); font-size: 40px; font-weight: 800; line-height: 1; }
-.vt-seance__big .adm-muted { font-family: var(--font-body); font-size: 16px; }
-
-.vt-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0; margin: 18px 0 8px; border-top: 1px solid var(--color-border); }
-.vt-stats > div { padding: 10px 0; border-bottom: 1px solid var(--color-border); }
-.vt-stats dt { font-size: 13px; color: var(--color-text-subtle); }
-.vt-stats dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
-.vt-stats dd.vt-kpis__note { margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--color-text-subtle); }
-
-.vt-verdict { margin: 8px 0; padding: 10px 14px; border-radius: 12px; font-size: 15px; border: 1px solid var(--color-border-strong); }
-.vt-verdict--ok { background: rgba(60, 179, 113, 0.12); border-color: rgba(60, 179, 113, 0.5); color: #BFEBD0; }
-.vt-verdict--warn { background: rgba(245, 184, 46, 0.1); border-color: rgba(245, 184, 46, 0.45); color: #FFE3A3; }
-
-.vt-table { font-size: 14px; }
-
-/* barres empilées par jour */
-.vt-chart { position: relative; display: flex; gap: 10px; margin-top: 18px; }
-.vt-chart__max { width: 28px; flex: none; padding-top: 0; font-size: 12px; color: var(--color-text-subtle); text-align: right; font-variant-numeric: tabular-nums; }
-.vt-chart__plot {
-    flex: 1;
-    min-width: 0;
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    gap: 6px;
-    height: 220px;
-    padding-bottom: 24px;
-    background: linear-gradient(var(--color-border), var(--color-border)) top / 100% 1px no-repeat;
-}
-.vt-col { position: relative; display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; outline: none; border-radius: 6px; }
-.vt-col__bar { display: flex; flex-direction: column-reverse; gap: 2px; height: 100%; border-bottom: 1px solid var(--color-border-strong); }
-.vt-col__seg { display: block; width: min(100%, 36px); margin: 0 auto; min-height: 3px; }
-.vt-col__seg:last-child { border-radius: 4px 4px 0 0; }
-.vt-col__label { position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--color-text-subtle); white-space: nowrap; }
-.vt-col:hover, .vt-col:focus-visible { background: rgba(255, 255, 255, 0.04); }
-.vt-col:focus-visible { box-shadow: 0 0 0 2px var(--color-accent); }
-
-.vt-tip {
-    position: absolute;
-    bottom: calc(100% - 40px);
-    left: 50%;
-    z-index: 3;
-    display: none;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 190px;
-    padding: 10px 12px;
-    transform: translateX(-50%);
-    border-radius: 10px;
-    border: 1px solid var(--color-border-strong);
-    background: var(--color-surface-3);
-    font-size: 13px;
-    color: var(--color-text-muted);
-    pointer-events: none;
-}
-.vt-tip strong { color: var(--color-text); }
-.vt-tip span { display: flex; align-items: center; gap: 6px; }
-.vt-col:hover .vt-tip, .vt-col:focus-visible .vt-tip { display: flex; }
-.vt-col:first-child .vt-tip, .vt-col:nth-child(2) .vt-tip { left: 0; transform: none; }
-.vt-col:last-child .vt-tip, .vt-col:nth-last-child(2) .vt-tip { left: auto; right: 0; transform: none; }
-
-.vt-details { margin-top: 14px; font-size: 14px; }
+.vt-details { font-size: 14px; }
 .vt-details summary { cursor: pointer; color: var(--color-text-muted); }
-.vt-details .adm-tablewrap { margin-top: 12px; }
-.vt-notes { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-left: 18px; }
+.vt-notes { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-left: 18px; overflow-wrap: anywhere; }
 
-@media (max-width: 900px) {
-    .vt-hero { grid-template-columns: 1fr; gap: 20px; }
-}
-
-/* téléphone : en-tête sur une ligne, tickets vendus visibles sans défiler */
+/* téléphone : total et séances visibles sans défiler */
 @media (max-width: 560px) {
     .vt-page { --gutter: 14px; }
     .vt-page .adm-top__in { flex-wrap: nowrap; gap: 8px; padding-top: 10px; padding-bottom: 10px; }
     .vt-page .adm-brand { gap: 8px; font-size: 15px; white-space: nowrap; }
     .vt-page .adm-brand__logo { width: 30px; height: 30px; }
     .vt-page .adm-btn--small { min-height: 34px; padding: 0 12px; font-size: 13px; }
-    .vt-page .adm-main { padding-top: 16px; gap: 14px; }
-    .vt-page .adm-card { padding: 16px; border-radius: 14px; }
-
+    .vt-page .adm-main { padding-top: 14px; gap: 10px; }
+    .vt-page .adm-card { padding: 14px; border-radius: 14px; }
     .vt-title .adm-h1 { font-size: 20px; }
-    .vt-title .adm-muted { font-size: 14px; }
+    .vt-title .adm-muted { margin-top: 0; font-size: 14px; }
 
-    .vt-hero { gap: 16px; }
-    .vt-hero__big { font-size: 64px; }
-    .vt-hero__sub { font-size: 15px; }
-    .vt-par { gap: 10px; }
-    .vt-par__item { padding: 14px; }
-    .vt-par__big { font-size: 44px; }
-    .vt-par__sub { font-size: 13px; }
-
-    .vt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
-    .vt-kpis > div { padding-left: 10px; }
-    .vt-kpis dt { font-size: 11px; }
-    .vt-kpis dd { font-size: 21px; }
-
-    .vt-seance__big { font-size: 32px; }
-    .vt-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-    .vt-chart__plot { gap: 3px; height: 180px; }
-    .vt-chart__max { width: 18px; }
-    .vt-col:nth-child(even) .vt-col__label { visibility: hidden; }
+    .vt-blocs { gap: 10px; }
+    .vt-bloc__big { font-size: 40px; }
+    .vt-bloc--total .vt-bloc__big { font-size: 60px; }
+    .vt-bloc__unit { font-size: 13px; }
+    .vt-jauges { gap: 12px; margin-top: 12px; }
+    .vt-bloc--total .vt-jauges { gap: 14px; }
+    .vt-jauge__head { flex-direction: column; }
+    .vt-jauge__name { font-size: 14px; line-height: 1.3; }
+    .vt-jauge__pct { font-size: 22px; line-height: 1.25; }
+    .vt-jauge__base { font-size: 13px; }
+    .vt-fill { height: 10px; margin: 4px 0; }
+    .vt-infos dd { font-size: 20px; }
 }
 @media (forced-colors: active) {
-    .vt-s1, .vt-s2, .vt-fill__seg, .vt-col__seg { background: CanvasText; forced-color-adjust: none; }
+    .vt-s1, .vt-s2 { background: CanvasText; forced-color-adjust: none; }
 }
