@@ -1,6 +1,7 @@
 {# Google Analytics et pixel Meta, sur les pages publiques seulement (ni /admin ni /ventes).
    Rien n'est chargé ni déposé tant que le visiteur n'a pas accepté : voir analytics_controller.js.
-   Variables facultatives : retour_paiement (page de retour), premiere_vue, achat (achat confirmé). #}
+   Variables facultatives : retour_paiement (page de retour), premiere_vue, achat (achat confirmé, Google Analytics),
+   pixel_page_view et achat_pub (pixel Meta : sur la page de retour, aucune page vue, un achat par visite). #}
 {% set ga_id = analytics_id() %}
 {% set pixel = pixel_id() %}
 {% if ga_id or pixel %}
@@ -12,7 +13,9 @@
         data-analytics-pixel-value="{{ pixel }}"
         data-analytics-return-value="{{ retour_paiement|default(false) ? 'true' : 'false' }}"
         data-analytics-page-view-value="{{ (premiere_vue ?? true) ? 'true' : 'false' }}"
+        data-analytics-pixel-page-view-value="{{ (pixel_page_view ?? premiere_vue ?? true) ? 'true' : 'false' }}"
         {% if achat|default(null) %}data-analytics-purchase-value="{{ achat|json_encode }}"{% endif %}
+        {% if achat_pub|default(null) %}data-analytics-pixel-purchase-value="{{ achat_pub|json_encode }}"{% endif %}
         hidden
     >
         <p class="cookies__text">Acceptez-vous les cookies {{ [ga_id ? "de mesure d'audience (Google Analytics)", pixel ? 'de publicité (Meta, Facebook et Instagram)']|filter(v => v)|join(' et ') }}&nbsp;?</p>

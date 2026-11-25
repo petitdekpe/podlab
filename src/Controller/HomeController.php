@@ -126,9 +126,29 @@ final class HomeController extends AbstractController
             }
         }
 
+        // Lieu de la séance réservée ; si la commande n'est pas retrouvée (autre appareil), ceux des séances à venir
+        $lieux = [];
+        foreach (null !== $seance ? [$seance] : array_filter($this->billetterie->seances(), static fn (Seance $s): bool => $s->aVenir()) as $s) {
+            if ('' !== $s->salle['maps']) {
+                $lieux[$s->salle['name']] = $s->salle['maps'];
+            }
+        }
+
+        // Pixel Meta : visiter cette page vaut un achat, quel que soit l'état du paiement.
+        // Une seule fois : par commande (même identifiant = un seul achat) ; sans commande
+        // retrouvée, à la première lecture seulement (la page se relit seule toutes les 5 s).
+        $commandeId = \is_array($derniere) ? (string) ($derniere['order_id'] ?? '') : '';
+        $achatPub = null;
+        if (!$this->tickAfrica->isTestMode() && ('' !== $commandeId || 0 === $request->query->getInt('n'))) {
+            $achatPub = ('' !== $commandeId ? ['transaction_id' => $commandeId] : [])
+                + ($derniere['achat'] ?? ['currency' => 'XOF', 'value' => 0, 'items' => []]);
+        }
+
         $response = $this->render('home/merci.html.twig', [
+            'achat_pub' => $achatPub,
             'statut' => $statut,
             'seance' => $seance,
+            'lieux' => $lieux,
             'email' => \is_array($derniere) ? ($derniere['email'] ?? null) : null,
             'relance' => \in_array($statut, ['pending', 'processing'], true) && $request->query->getInt('n') < 6,
             'n' => $request->query->getInt('n') + 1,

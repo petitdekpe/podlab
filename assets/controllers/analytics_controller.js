@@ -23,6 +23,8 @@ export default class extends Controller {
         return: Boolean,
         pageView: { type: Boolean, default: true },
         purchase: Object,
+        pixelPageView: { type: Boolean, default: true },
+        pixelPurchase: Object,
     };
 
     connect() {
@@ -88,15 +90,19 @@ export default class extends Controller {
             // le pixel lit l'adresse lui-même : les paramètres du paiement en sont retirés
             history.replaceState(history.state, '', location.pathname + location.hash);
         }
-        meta.start(this.pixelValue, { pageView: this.pageViewValue });
-        this.purchase(meta, 'achat-pub');
+        meta.start(this.pixelValue, { pageView: this.pixelPageViewValue });
+        this.purchase(meta, 'achat-pub', this.pixelPurchaseValue);
     }
 
-    purchase(tool, prefix) {
-        const id = this.purchaseValue.transaction_id;
-        if (!id || this.read(`${prefix}-${id}`) !== null) return;
-        this.write(`${prefix}-${id}`, '1');
-        tool.track('purchase', this.purchaseValue);
+    purchase(tool, prefix, achat = this.purchaseValue) {
+        const id = achat.transaction_id;
+        if (id) {
+            if (this.read(`${prefix}-${id}`) !== null) return;
+            this.write(`${prefix}-${id}`, '1');
+        } else if (!Object.keys(achat).length) {
+            return;
+        }
+        tool.track('purchase', achat);
     }
 
     // --- mémoire du navigateur (peut être bloquée : le bandeau revient alors) ----

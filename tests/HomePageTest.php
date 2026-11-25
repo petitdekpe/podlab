@@ -109,6 +109,9 @@ final class HomePageTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('h1', 'Merci');
+        // Pas de retour au site : des liens vers Google Maps, un par salle quand la commande n'est pas retrouvée
+        self::assertSelectorNotExists('.thanks__actions a[href="/"]');
+        self::assertSelectorExists('.thanks__actions a[href^="https://www.google.com/maps/search/"][target="_blank"]');
     }
 
     private function client(): KernelBrowser

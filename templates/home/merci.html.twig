@@ -46,12 +46,19 @@
                 {% endif %}
             {% endif %}
 
-            <a href="{{ path('app_home') }}{{ statut in ['cancelled', 'refunded'] ? '#reservation' }}" data-turbo="false" class="btn btn--primary">
-                {{ statut in ['cancelled', 'refunded'] ? 'Recommencer ma réservation' : 'Retour au site' }}
-            </a>
+            <div class="thanks__actions">
+                {% if statut in ['cancelled', 'refunded'] %}
+                    <a href="{{ path('app_home') }}#reservation" data-turbo="false" class="btn btn--primary">Recommencer ma réservation</a>
+                {% else %}
+                    {# Ils viennent du site : plutôt que d'y retourner, on leur montre où aller #}
+                    {% for nom, recherche in lieux %}
+                        <a href="https://www.google.com/maps/search/?api=1&amp;query={{ recherche|url_encode }}" target="_blank" rel="noopener" class="btn btn--primary">{{ lieux|length > 1 ? 'Découvrir ' ~ nom : 'Découvrir les lieux' }}</a>
+                    {% endfor %}
+                {% endif %}
+            </div>
             <p class="live__hint-text">Une question&nbsp;? WhatsApp 0166617878 ou contact@beninbouge.com.</p>
         </div>
     </main>
 {% endblock %}
 
-{% block analytics %}{{ include('_analytics.html.twig', { retour_paiement: true, premiere_vue: n == 1 }) }}{% endblock %}
+{% block analytics %}{{ include('_analytics.html.twig', { retour_paiement: true, premiere_vue: n == 1, pixel_page_view: false, achat_pub: achat_pub }) }}{% endblock %}

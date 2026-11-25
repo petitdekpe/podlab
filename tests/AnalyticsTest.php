@@ -122,6 +122,44 @@ final class AnalyticsTest extends WebTestCase
         }
     }
 
+    public function testPixelCountsEachReturnVisitAsOnePurchaseWithoutPageView(): void
+    {
+        $client = $this->client('', pixel: '123456789012345');
+        $this->statut = 'pending';
+        $this->commander($client);
+        $crawler = $client->request('GET', '/billetterie/merci');
+
+        // Paiement pas encore confirmé : la visite compte quand même, sans page vue
+        $bandeau = $crawler->filter('.cookies');
+        self::assertSame('false', $bandeau->attr('data-analytics-pixel-page-view-value'));
+        $achat = json_decode((string) $bandeau->attr('data-analytics-pixel-purchase-value'), true);
+        self::assertSame('pay-1', $achat['transaction_id']);
+        self::assertSame(20000, $achat['value']);
+
+        // Relecture automatique de la page : même commande, comptée une seule fois par le navigateur
+        $crawler = $client->request('GET', '/billetterie/merci?n=1');
+        self::assertSame('false', $crawler->filter('.cookies')->attr('data-analytics-pixel-page-view-value'));
+        self::assertSame('pay-1', json_decode((string) $crawler->filter('.cookies')->attr('data-analytics-pixel-purchase-value'), true)['transaction_id']);
+    }
+
+    public function testPixelPurchaseWithoutKnownOrderOnlyOnFirstRead(): void
+    {
+        $client = $this->client('', pixel: '123456789012345');
+        $crawler = $client->request('GET', '/billetterie/merci');
+        self::assertNotNull($crawler->filter('.cookies')->attr('data-analytics-pixel-purchase-value'));
+
+        $crawler = $client->request('GET', '/billetterie/merci?n=2');
+        self::assertNull($crawler->filter('.cookies')->attr('data-analytics-pixel-purchase-value'));
+    }
+
+    public function testPixelKeepsItsPageViewOnOtherPages(): void
+    {
+        $crawler = $this->client('', pixel: '123456789012345')->request('GET', '/');
+
+        self::assertSame('true', $crawler->filter('.cookies')->attr('data-analytics-pixel-page-view-value'));
+        self::assertNull($crawler->filter('.cookies')->attr('data-analytics-pixel-purchase-value'));
+    }
+
     public function testBannerNamesBothUses(): void
     {
         $this->client('G-TEST123456', pixel: '123456789012345')->request('GET', '/');

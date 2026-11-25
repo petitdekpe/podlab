@@ -2534,7 +2534,7 @@ html.is-modal-open { overflow: hidden; }
     letter-spacing: -0.02em;
 }
 .venue-card__sub { margin-top: 10px; font-size: 18px; font-weight: 500; }
-.venue-card__dates { margin: 18px 0 24px; padding-left: 20px; font-weight: 600; }
+.venue-card__dates { margin: 18px 0 0; padding-left: 20px; font-weight: 600; }
 .venue-card__info .btn { margin-top: auto; }
 .venue-card .soldout-tag--ink { margin-left: 6px; }
 .venues__lead { margin-top: 20px; color: var(--color-text-muted); }
@@ -2542,6 +2542,8 @@ html.is-modal-open { overflow: hidden; }
 /* --- page de retour après paiement --- */
 .thanks { padding-top: 32px; padding-bottom: 96px; }
 .thanks__panel { max-width: 620px; }
+.thanks__actions { display: flex; flex-wrap: wrap; gap: 10px 12px; margin-top: 20px; }
+.thanks__actions .btn { margin-top: 0; }
 .thanks__seance {
     margin-top: 20px;
     padding: 14px 16px;
