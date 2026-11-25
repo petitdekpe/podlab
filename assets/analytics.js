@@ -31,16 +31,7 @@ export function track(name, params = {}) {
     if (started) window.gtag('event', name, params);
 }
 
-/** Retrait de l'accord : plus aucun envoi, cookies _ga effacés. */
+/** Retrait de l'accord : plus aucun envoi (cookies effacés par forgetCookies). */
 export function forget(id) {
     window[`ga-disable-${id}`] = true;
-    const parts = location.hostname.split('.');
-    for (const cookie of document.cookie.split(';')) {
-        const name = cookie.split('=')[0].trim();
-        if (name !== '_ga' && !name.startsWith('_ga_')) continue;
-        const expired = `${name}=; path=/; max-age=0`;
-        document.cookie = expired;
-        // Google pose ses cookies sur le domaine parent (beninbouge.com)
-        parts.forEach((_, i) => (document.cookie = `${expired}; domain=${parts.slice(i).join('.')}`));
-    }
 }

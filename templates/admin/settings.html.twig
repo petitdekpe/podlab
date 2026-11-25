@@ -50,11 +50,19 @@
             Laissé vide, le site envoie <code>{{ form.return_url ?: return_url_default }}</code>&nbsp;: c'est cette adresse qu'il faut copier sur la clé.
         </p>
 
-        <h2 class="adm-h2 adm-h2--section">Mesure d'audience</h2>
+        <h2 class="adm-h2 adm-h2--section">Mesure d'audience et publicité</h2>
 
         <label class="adm-label" for="analytics_id">Google Analytics : identifiant de mesure</label>
         <input id="analytics_id" name="analytics_id" type="text" class="adm-input" maxlength="30" value="{{ form.analytics_id }}" placeholder="G-XXXXXXXXXX" autocomplete="off" spellcheck="false">
-        <p class="adm-help">Dans Google Analytics&nbsp;: Administration, Flux de données, votre site. Mesure les pages publiques seulement, après accord du visiteur. Vide&nbsp;: ni mesure, ni bandeau de cookies.</p>
+        <p class="adm-help">Dans Google Analytics&nbsp;: Administration, Flux de données, votre site. Mesure les pages publiques seulement, après accord du visiteur. Vide&nbsp;: pas de mesure.</p>
+
+        <label class="adm-label" for="pixel_id">Pixel Meta (Facebook, Instagram) : identifiant</label>
+        <input id="pixel_id" name="pixel_id" type="text" class="adm-input" maxlength="30" value="{{ form.pixel_id }}" placeholder="123456789012345" inputmode="numeric" autocomplete="off" spellcheck="false">
+        <p class="adm-help">
+            Dans le Gestionnaire d'évènements Meta&nbsp;: Sources de données, votre pixel, Paramètres. Les chiffres seulement, pas le code.
+            Envoie, après accord du visiteur&nbsp;: page vue, séance choisie (ViewContent), paiement lancé (InitiateCheckout) et achat confirmé (Purchase). Aucune donnée personnelle. Vide&nbsp;: pas de pixel.
+            <br>Sans Google Analytics ni pixel, le bandeau de cookies ne s'affiche pas.
+        </p>
 
         <p class="adm-actions"><button type="submit" class="adm-btn adm-btn--primary">Enregistrer</button></p>
     </form>

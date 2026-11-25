@@ -122,6 +122,7 @@ final class AdminController extends AbstractController
         $form = [
             'return_url' => $this->settings->returnUrl(),
             'analytics_id' => $this->settings->analyticsId(),
+            'pixel_id' => $this->settings->pixelId(),
         ];
         $warnings = [];
 
@@ -132,6 +133,7 @@ final class AdminController extends AbstractController
                 $form = [
                     'return_url' => trim((string) $request->request->get('return_url')),
                     'analytics_id' => trim((string) $request->request->get('analytics_id')),
+                    'pixel_id' => trim((string) $request->request->get('pixel_id')),
                 ];
                 // La clé n'est jamais réaffichée : champ vide = on garde celle enregistrée
                 $apiKey = trim((string) $request->request->get('tickafrica_api_key'));
@@ -145,6 +147,10 @@ final class AdminController extends AbstractController
                     $errors[] = 'L\'identifiant de mesure Google Analytics commence par « G- » (ex. G-AB12CD34EF).';
                 }
 
+                if ('' !== $form['pixel_id'] && '' === LiveSettings::normalizePixelId($form['pixel_id'])) {
+                    $errors[] = 'L\'identifiant du pixel Meta ne contient que des chiffres (10 à 20). Ne collez pas le code complet.';
+                }
+
                 if ('' !== $apiKey && !$clearKey) {
                     $keyError = $this->checkApiKey($apiKey, $warnings);
                     if (null !== $keyError) {
@@ -155,6 +161,7 @@ final class AdminController extends AbstractController
                 if ([] === $errors) {
                     $this->settings->set('return_url', $form['return_url'] ?: null);
                     $this->settings->set('analytics_id', LiveSettings::normalizeAnalyticsId($form['analytics_id']) ?: null);
+                    $this->settings->set('pixel_id', LiveSettings::normalizePixelId($form['pixel_id']) ?: null);
                     if ($clearKey) {
                         $this->settings->setTickafricaApiKey(null);
                     } elseif ('' !== $apiKey) {

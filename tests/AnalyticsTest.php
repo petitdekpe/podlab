@@ -103,6 +103,40 @@ final class AnalyticsTest extends WebTestCase
         }
     }
 
+    public function testPixelAloneShowsTheBannerWithoutLoadingMeta(): void
+    {
+        $client = $this->client('', pixel: '123456789012345');
+
+        foreach (['/', '/billetterie/merci'] as $url) {
+            $client->request('GET', $url);
+            self::assertSelectorExists('.cookies[hidden][data-analytics-pixel-value="123456789012345"][data-analytics-id-value=""]');
+            self::assertSelectorTextContains('.cookies__text', 'de publicité (Meta');
+            self::assertSelectorTextNotContains('.cookies__text', 'Google');
+            self::assertStringNotContainsString('connect.facebook.net', (string) $client->getResponse()->getContent());
+        }
+        $client->request('GET', '/');
+        self::assertSelectorExists('[data-cookies]');
+        foreach (['/ventes', '/admin/connexion'] as $url) {
+            $client->request('GET', $url);
+            self::assertSelectorNotExists('.cookies');
+        }
+    }
+
+    public function testBannerNamesBothUses(): void
+    {
+        $this->client('G-TEST123456', pixel: '123456789012345')->request('GET', '/');
+
+        self::assertSelectorTextContains('.cookies__text', "de mesure d'audience (Google Analytics) et de publicité (Meta");
+    }
+
+    public function testPixelIdFormat(): void
+    {
+        self::assertSame('123456789012345', LiveSettings::normalizePixelId(' 123456789012345 '));
+        foreach (['', '12345', 'G-AB12CD34EF', "fbq('init', '123456789012345')", '123456789012345"><script>'] as $invalide) {
+            self::assertSame('', LiveSettings::normalizePixelId($invalide));
+        }
+    }
+
     private function commander(KernelBrowser $client): void
     {
         $client->submit($client->request('GET', '/')->filter('form.order')->form([
@@ -112,7 +146,7 @@ final class AnalyticsTest extends WebTestCase
         self::assertResponseRedirects('https://checkout.fedapay.com/test', 303);
     }
 
-    private function client(string $id, string $cle = 'ta_live_cle'): KernelBrowser
+    private function client(string $id, string $cle = 'ta_live_cle', string $pixel = ''): KernelBrowser
     {
         foreach (['TICKAFRICA_API_KEY' => $cle] + self::ENV as $name => $value) {
             $_SERVER[$name] = $_ENV[$name] = $value;
@@ -121,7 +155,7 @@ final class AnalyticsTest extends WebTestCase
         $client->disableReboot();
 
         $repository = $this->createStub(EntityRepository::class);
-        $repository->method('findAll')->willReturn([new Setting('analytics_id', $id)]);
+        $repository->method('findAll')->willReturn([new Setting('analytics_id', $id), new Setting('pixel_id', $pixel)]);
         $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getRepository')->willReturn($repository);
         static::getContainer()->set(LiveSettings::class, new LiveSettings($em, static::getContainer()->get(LiveConfig::class)));

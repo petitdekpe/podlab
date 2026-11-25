@@ -1,5 +1,5 @@
 import { Controller } from '@hotwired/stimulus';
-import { track } from '../analytics.js';
+import { track } from '../tracking.js';
 
 /*
  * Billetterie des séances : formulaire de réservation.

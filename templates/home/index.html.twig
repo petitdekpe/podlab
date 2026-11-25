@@ -366,7 +366,7 @@
             <span>Une Édition Spéciale Podlab × Bénin Bouge, en partenariat avec Majestic Bénin et Tick Africa, sponsors officiels.</span>
         </div>
         <span>Une question&nbsp;? Écrivez-nous sur WhatsApp au 0166617878 ou à contact@beninbouge.com.</span>
-        {% if analytics_id() %}<button type="button" class="site-footer__cookies" data-cookies>Cookies</button>{% endif %}
+        {% if analytics_id() or pixel_id() %}<button type="button" class="site-footer__cookies" data-cookies>Cookies</button>{% endif %}
     </footer>
 {% endblock %}
 

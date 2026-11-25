@@ -104,6 +104,19 @@ final class LiveSettings implements ResetInterface
         return preg_match('/^G-[A-Z0-9]{4,20}$/', $value) ? $value : '';
     }
 
+    /** Identifiant du pixel Meta (Facebook, Instagram), ou '' : pas de pixel. */
+    public function pixelId(): string
+    {
+        return self::normalizePixelId((string) $this->get('pixel_id'));
+    }
+
+    public static function normalizePixelId(string $value): string
+    {
+        $value = trim($value);
+
+        return preg_match('/^[0-9]{10,20}$/D', $value) ? $value : '';
+    }
+
     /**
      * N'accepte qu'un lien https. Pour Tickafrica, la couleur principale du site
      * est ajoutée si elle n'est pas déjà dans le lien. Retourne '' si invalide.

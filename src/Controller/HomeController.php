@@ -98,7 +98,7 @@ final class HomeController extends AbstractController
             'order_id' => $paiement['order_id'],
             'seance' => $commande->seanceKey(),
             'email' => $commande->email,
-            // Mesure d'audience (Google Analytics) : aucune donnée sur l'acheteur
+            // Mesure d'audience et pixel Meta : aucune donnée sur l'acheteur
             'achat' => [
                 'currency' => 'XOF',
                 'value' => $tarif->price * $commande->quantity,
