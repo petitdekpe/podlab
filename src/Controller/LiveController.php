@@ -55,7 +55,7 @@ final class LiveController extends AbstractController
             $viewer['super'] => 'direct',
             Direct::TERMINE === $phase => 'termine',
             !$direct->accesOuvert => 'ferme',
-            $viewer['valid'] && Direct::AVANT === $phase => 'attente',
+            $viewer['valid'] && new \DateTimeImmutable() < $direct->debutDiffusion() => 'attente',
             $viewer['valid'] => 'direct',
             $viewer['replaced'] => 'remplace',   // billet repris sur un autre appareil
             default => 'verrouille',
@@ -64,9 +64,10 @@ final class LiveController extends AbstractController
         return $this->noStore($this->render('live/index.html.twig', [
             'etat' => $etat,
             'title' => $direct->titre,
-            'opens_at' => $direct->ouverture(),
+            'opens_at' => $direct->debutDiffusion(),
             'ends_at' => $direct->fin(),
-            'opens_label' => DateFr::complet($direct->ouverture()),
+            'opens_label' => DateFr::complet($direct->debutDiffusion()),
+            'enregistree' => $direct->enregistree,
             'watermark' => $viewer['super'] ? 'Superadmin' : ($direct->filigrane && $viewer['code'] ? 'Billet '.$viewer['code']->getCode() : null),
             'is_super' => $viewer['super'],
         ]));
@@ -187,7 +188,7 @@ final class LiveController extends AbstractController
             return $error;
         }
 
-        if (!$viewer['super'] && Direct::AVANT === $direct?->phase()) {
+        if (!$viewer['super'] && new \DateTimeImmutable() < $direct?->debutDiffusion()) {
             return $this->noStore(new JsonResponse(['error' => 'pas_ouvert'], Response::HTTP_FORBIDDEN));
         }
 
@@ -196,7 +197,7 @@ final class LiveController extends AbstractController
             return $this->noStore(new JsonResponse(['error' => 'non_configure'], Response::HTTP_SERVICE_UNAVAILABLE));
         }
 
-        return $this->noStore(new JsonResponse(['videoId' => $videoId]));
+        return $this->noStore(new JsonResponse(['videoId' => $videoId] + $this->deroule($direct)));
     }
 
     /** Signal de présence : indique si ce billet est toujours celui qui a la main. */
@@ -214,10 +215,32 @@ final class LiveController extends AbstractController
             $this->sessions->touch($viewer['code']);
         }
 
-        return $this->noStore(new Response(null, Response::HTTP_NO_CONTENT));
+        // Le déroulé est renvoyé à chaque signal : un horaire modifié pendant le direct est suivi
+        return $this->noStore(new JsonResponse($this->deroule($direct)));
     }
 
     // ---------------------------------------------------------------------
+
+    /**
+     * Passages de l'habillage et lancement d'une vidéo enregistrée (null pour un direct),
+     * en millisecondes, avec l'heure du serveur : le lecteur ne se fie pas à l'horloge
+     * de l'appareil.
+     *
+     * @return array{maintenant: int, lancement: ?int, habillage: list<array{int, int}>}
+     */
+    private function deroule(?Direct $direct): array
+    {
+        $lancement = $direct?->lancement();
+
+        return [
+            'maintenant' => (int) (microtime(true) * 1000),
+            'lancement' => null === $lancement ? null : $lancement->getTimestamp() * 1000,
+            'habillage' => array_map(
+                fn (\DateTimeImmutable $debut): array => [$debut->getTimestamp() * 1000, ($debut->getTimestamp() + $direct->habillageDuree) * 1000],
+                $direct?->passagesHabillage() ?? [],
+            ),
+        ];
+    }
 
     /**
      * @param array{super: bool, valid: bool, replaced: bool, code: ?LiveCode, token: ?string} $viewer

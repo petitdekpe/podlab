@@ -29,7 +29,19 @@
 
         <label class="adm-label" for="youtube">Vidéo YouTube</label>
         <input id="youtube" name="youtube" type="text" class="adm-input" value="{{ form.youtube }}" placeholder="https://www.youtube.com/watch?v=… ou identifiant" autocomplete="off" spellcheck="false">
-        <p class="adm-help">Vidéo « non répertoriée », intégration autorisée, <strong>option DVR désactivée</strong> dans YouTube Studio (sinon les spectateurs peuvent reculer). Jamais visible dans le code de la page : elle n'est fournie qu'aux billets valides.</p>
+        <p class="adm-help">Lien d'un direct ou d'une vidéo déjà en ligne. Vidéo « non répertoriée », intégration autorisée. Pour un direct, <strong>désactivez l'option DVR</strong> dans YouTube Studio (sinon les spectateurs peuvent reculer). Jamais visible dans le code de la page : elle n'est fournie qu'aux billets valides.</p>
+
+        <label class="adm-check">
+            <input type="checkbox" name="enregistree" value="1"{{ form.enregistree ? ' checked' }}>
+            <span><strong>C'est une vidéo déjà enregistrée, pas un direct</strong><br><span class="adm-muted">Elle est diffusée comme un direct : elle démarre à la même heure pour tout le monde, sans pause ni retour en arrière. Un retardataire la prend en cours de route.</span></span>
+        </label>
+        <label class="adm-label" for="lancement">Heure de lancement de la vidéo enregistrée</label>
+        <input id="lancement" name="lancement" type="time" class="adm-input" value="{{ form.lancement }}">
+        <p class="adm-help">
+            Heure du Bénin. Laissez vide pour la lancer au début de la séance, ou à l'ouverture s'il n'y a pas de séance. Ignorée pour un direct.
+            Prévoyez une «&nbsp;fin&nbsp;» postérieure à la fin de la vidéo.
+            {% if direct.id and direct.lancement %}<br><strong>Lancement enregistré&nbsp;: {{ direct.lancement|date('H\\hi', 'Africa/Porto-Novo') }}.</strong>{% endif %}
+        </p>
 
         <div class="adm-row">
             <div>
@@ -59,6 +71,31 @@
         <label class="adm-label" for="billetterie">Lien d'achat (Tick Africa)</label>
         <input id="billetterie" name="billetterie" type="url" class="adm-input" maxlength="500" value="{{ form.billetterie }}" placeholder="https://tick.africa/embed/…" autocomplete="off" spellcheck="false">
         <p class="adm-help">Lien d'intégration (embed) affiché dans la fenêtre d'achat du site. Tant qu'il est vide, la fenêtre indique que la billetterie ouvre bientôt.</p>
+
+        <h2 class="adm-h2 adm-h2--section">Habillage publicitaire (Tick Africa)</h2>
+        <label class="adm-check">
+            <input type="checkbox" name="habillage" value="1"{{ form.habillage ? ' checked' }}>
+            <span><strong>Afficher l'habillage en L, 3 fois pendant le direct</strong><br><span class="adm-muted">La vidéo se réduit en haut à droite le temps du passage, sans coupure ni perte du son.</span></span>
+        </label>
+        <div class="adm-row">
+            {% for n in 1..3 %}
+                <div>
+                    <label class="adm-label" for="passage{{ n }}">Passage {{ n }}</label>
+                    <input id="passage{{ n }}" name="passage{{ n }}" type="time" class="adm-input" value="{{ attribute(form, 'passage' ~ n) }}">
+                </div>
+            {% endfor %}
+        </div>
+        <p class="adm-help">
+            Heure du Bénin. Laissez les trois champs vides pour une répartition automatique sur la séance.
+            Vous pouvez les modifier pendant le direct (retard du spectacle…)&nbsp;: les spectateurs connectés suivent en 20 secondes environ, sans recharger la page.
+            YouTube diffuse avec un décalage&nbsp;: prévoyez une marge autour des moments importants.
+            {% if direct.id and direct.passagesHabillage %}
+                <br><strong>Passages enregistrés&nbsp;: {{ direct.passagesHabillage|map(p => p|date('H\\hi', 'Africa/Porto-Novo'))|join(', ') }}.</strong>
+            {% endif %}
+        </p>
+
+        <label class="adm-label" for="duree">Durée d'un passage (secondes)</label>
+        <input id="duree" name="duree" type="number" class="adm-input" min="10" max="300" value="{{ form.duree }}" required>
 
         <h2 class="adm-h2 adm-h2--section">Affichage et accès</h2>
         <label class="adm-check">

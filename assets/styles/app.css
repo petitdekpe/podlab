@@ -1232,6 +1232,52 @@ input:focus-visible {
     aspect-ratio: auto;
 }
 
+/* image 16:9 du lecteur, centrée en plein écran quel que soit l'écran */
+.live__canvas {
+    position: absolute;
+    inset: 0;
+}
+.live__stage.is-fullscreen .live__canvas {
+    width: min(100%, 100vh * 16 / 9);
+    height: min(100%, 100vw * 9 / 16);
+    margin: auto;
+}
+
+.live__video {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    background: #000;
+    transform-origin: 0 0;
+    transition: transform 0.8s cubic-bezier(0.65, 0, 0.35, 1), border-radius 0.8s;
+}
+
+/* Habillage en L (maquette 1920 × 1080) : la vidéo prend la zone de 1504 × 846 placée
+   à 400 px du bord gauche et 16 px du haut, avec des coins arrondis de 26 px */
+.live__habillage {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    visibility: hidden;
+    transition: visibility 0s 0.8s; /* reste visible pendant que la vidéo reprend sa place */
+}
+.has-habillage .live__habillage {
+    visibility: visible;
+    transition-delay: 0s;
+}
+.has-habillage .live__video {
+    transform: translate(20.8333%, 1.4815%) scale(0.78333);
+    border-radius: 1.729% / 3.073%;
+}
+/* les commandes restent sur la vidéo : elles ne masquent ni le QR code ni l'adresse */
+.has-habillage .live__bar {
+    left: 20.8333%;
+    right: 0.8333%;
+    bottom: 20.1852%;
+}
+
 /* calque transparent : aucun clic n'atteint la vidéo */
 .live__shield {
     position: absolute;
@@ -1385,7 +1431,9 @@ input:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
     .live__dot { animation: none; }
-    .live__watermark { transition: none; }
+    .live__watermark,
+    .live__video,
+    .live__habillage { transition: none; }
 }
 
 /* ==========================================================================

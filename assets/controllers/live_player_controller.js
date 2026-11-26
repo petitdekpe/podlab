@@ -15,6 +15,11 @@ import { Controller } from '@hotwired/stimulus';
  *   celui qui a la main. Sinon la vidéo est retirée.
  * - Un filigrane avec le numéro du billet se déplace sur l'image, pour
  *   décourager les enregistrements partagés.
+ * - Habillage publicitaire : aux horaires fournis par le serveur, la vidéo se
+ *   réduit et laisse voir l'image en L. La lecture n'est pas interrompue.
+ * - Vidéo enregistrée (et non un direct YouTube) : le serveur donne son heure de
+ *   lancement. Le lecteur se cale sur le temps écoulé depuis cette heure, et y
+ *   revient s'il s'en écarte : tout le monde voit la même chose au même moment.
  *
  * NB : le retour en arrière dans un direct YouTube se désactive dans
  * YouTube Studio (option DVR) ; ce contrôleur ne peut pas l'imposer seul.
@@ -22,6 +27,9 @@ import { Controller } from '@hotwired/stimulus';
 
 const PING_EVERY = 20_000;
 const WATERMARK_EVERY = 12_000;
+const CLOCK_EVERY = 500;
+const MAX_DRIFT = 5; // secondes d'écart tolérées avec la diffusion
+const SEEK_EVERY = 10_000; // au plus un recalage par période : une connexion lente doit pouvoir charger
 
 let youtubeApi = null;
 function loadYouTubeApi() {
@@ -65,12 +73,21 @@ export default class extends Controller {
         this.moveTimer = setInterval(() => this.moveWatermark(), WATERMARK_EVERY);
         this.moveWatermark();
 
+        this.passages = []; // [début, fin] en millisecondes, heure du serveur
+        this.lancement = null; // vidéo enregistrée seulement
+        this.clockOffset = 0;
+        this.joined = false;
+        this.waiting = false;
+        this.lastSeek = 0;
+        this.clockTimer = setInterval(() => this.tick(), CLOCK_EVERY);
+
         this.prepare();
     }
 
     disconnect() {
         clearInterval(this.pingTimer);
         clearInterval(this.moveTimer);
+        clearInterval(this.clockTimer);
         clearTimeout(this.hintTimer);
         this.stageTarget.removeEventListener('contextmenu', this.onContextMenu);
         document.removeEventListener('fullscreenchange', this.onFullscreenChange);
@@ -89,7 +106,8 @@ export default class extends Controller {
             if (response.status === 503) return this.fail('Le direct n\'est pas encore configuré. Réessayez dans quelques minutes.');
             if (!response.ok) return this.fail('Impossible de charger le direct. Rechargez la page.');
 
-            const { videoId } = await response.json();
+            const { videoId, ...programme } = await response.json();
+            this.sync(programme);
             await loadYouTubeApi();
             if (this.stopped) return;
 
@@ -132,23 +150,33 @@ export default class extends Controller {
         if (!this.player) return;
         this.player.unMute();
         this.player.setVolume(Number(this.volumeTarget.value));
-        this.player.playVideo();
 
         this.gateTarget.hidden = true;
         this.barTarget.hidden = false;
         this.syncMuteIcon();
 
-        // Si rien ne démarre (direct pas encore lancé côté YouTube, navigateur strict…)
-        this.hintTimer = setTimeout(() => {
-            if (!this.playing) this.showHint('En attente du début du direct…');
-        }, 4000);
+        this.joined = true;
+        this.start();
     }
 
     retry() {
-        this.hintTarget.hidden = true;
         this.player?.unMute();
-        this.player?.playVideo();
+        this.start();
+    }
+
+    // Lance la lecture, au bon endroit s'il s'agit d'une vidéo enregistrée
+    start() {
+        if (!this.player) return;
+        this.hintTarget.hidden = true;
         clearTimeout(this.hintTimer);
+        this.waiting = false;
+
+        const position = this.position();
+        if (position !== null && position < 0) return this.wait();
+        if (position !== null) this.seek(position);
+        this.player.playVideo();
+
+        // Si rien ne démarre (direct pas encore lancé côté YouTube, navigateur strict…)
         this.hintTimer = setTimeout(() => {
             if (!this.playing) this.showHint('En attente du début du direct…');
         }, 4000);
@@ -202,7 +230,7 @@ export default class extends Controller {
             this.hintTarget.hidden = true;
         }
         // Pas de pause possible dans un direct : on relance
-        if (state === PAUSED && !this.stopped) this.player.playVideo();
+        if (state === PAUSED && !this.stopped && !this.waiting) this.player.playVideo();
         if (state === ENDED) this.block('ended');
     }
 
@@ -223,6 +251,7 @@ export default class extends Controller {
             if (response.status === 409) this.block('used');
             else if (response.status === 410) this.block('ended');
             else if (response.status === 401 || response.status === 423) location.reload(); // déconnecté ou accès fermé
+            else if (response.ok) this.sync(await response.json());
         } catch (e) {
             // réseau coupé un instant : on réessaie au prochain signal
         }
@@ -234,6 +263,8 @@ export default class extends Controller {
         this.stopped = true;
         clearInterval(this.pingTimer);
         clearTimeout(this.hintTimer);
+        clearInterval(this.clockTimer);
+        this.stageTarget.classList.remove('has-habillage');
 
         if (document.fullscreenElement) document.exitFullscreen?.();
         this.player?.destroy?.();
@@ -254,6 +285,79 @@ export default class extends Controller {
             credentials: 'same-origin',
             headers: { 'X-CSRF-Token': this.csrfValue, Accept: 'application/json' },
         });
+    }
+
+    // --- Déroulé : horloge du serveur ------------------------------------------
+
+    sync({ maintenant, lancement, habillage }) {
+        if (this.stopped) return;
+        this.clockOffset = maintenant - Date.now();
+        this.lancement = lancement;
+        this.passages = habillage;
+        this.tick();
+    }
+
+    now() {
+        return Date.now() + this.clockOffset;
+    }
+
+    tick() {
+        this.updateHabillage();
+        this.followBroadcast();
+    }
+
+    // --- Vidéo enregistrée diffusée comme un direct ----------------------------
+
+    // Secondes écoulées depuis le lancement ; null pour un direct YouTube
+    position() {
+        return this.lancement === null ? null : (this.now() - this.lancement) / 1000;
+    }
+
+    followBroadcast() {
+        if (this.stopped || !this.joined || !this.player || this.lancement === null) return;
+
+        const PLAYING = 1;
+        const position = this.position();
+
+        // Lancement repoussé pendant la lecture, ou pas encore atteint (supercode)
+        if (position < 0) {
+            if (!this.waiting) this.wait();
+            else if (this.player.getPlayerState() === PLAYING) this.player.pauseVideo();
+            return;
+        }
+        if (this.waiting) return this.start();
+
+        // La durée vaut 0 tant que YouTube ne l'a pas chargée
+        const duration = this.player.getDuration();
+        if (duration > 0 && position >= duration) return this.block('ended');
+
+        if (this.player.getPlayerState() === PLAYING
+            && Math.abs(this.player.getCurrentTime() - position) > MAX_DRIFT
+            && Date.now() - this.lastSeek > SEEK_EVERY) {
+            this.seek(position);
+        }
+    }
+
+    wait() {
+        this.waiting = true;
+        clearTimeout(this.hintTimer);
+        this.player.pauseVideo();
+        const heure = new Date(this.lancement).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Porto-Novo' });
+        this.showHint(`La diffusion commence à ${heure.replace(':', 'h')}.`);
+    }
+
+    seek(position) {
+        this.lastSeek = Date.now();
+        this.player.seekTo(position, true);
+    }
+
+    // --- Habillage publicitaire ------------------------------------------------
+
+    // Même heure pour tout le monde : qui arrive pendant un passage en voit la fin
+    updateHabillage() {
+        const now = this.now();
+        const active = this.passages.some(([debut, fin]) => now >= debut && now < fin);
+        this.stageTarget.classList.toggle('has-habillage', active);
     }
 
     // --- Filigrane -------------------------------------------------------------

@@ -370,6 +370,129 @@ final class AdminProgrammeTest extends WebTestCase
         self::assertSelectorNotExists('.venues__lead');
     }
 
+    public function testHabillageTimesAreChosenAndSentToThePlayer(): void
+    {
+        $this->connexion();
+        $this->ajouterDirect('2030-06-15T19:00', '2030-06-15T23:00');
+        $url = '/admin/directs/'.$this->direct()->getId();
+        self::assertSame(['20h00', '21h00', '22h00'], $this->heuresDePassage());
+
+        // Les trois heures ou aucune, dans la fenêtre, sans chevauchement
+        foreach ([
+            'trois heures' => ['passage1' => '20:10'],
+            'entre l\'ouverture' => ['passage1' => '20:10', 'passage2' => '21:10', 'passage3' => '23:30'],
+            'chevauchent' => ['passage1' => '20:10', 'passage2' => '20:10', 'passage3' => '22:10'],
+            'entre 10 et 300' => ['duree' => '5'],
+        ] as $message => $champs) {
+            $this->client->request('GET', $url);
+            $this->client->submitForm('Enregistrer', $champs);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSelectorTextContains('.adm-alert--error', $message);
+        }
+
+        $this->client->request('GET', $url);
+        $this->client->submitForm('Enregistrer', ['passage1' => '21:45', 'passage2' => '19:20', 'passage3' => '20:30', 'duree' => '45']);
+        self::assertResponseRedirects('/admin/directs');
+        self::assertSame(['19h20', '20h30', '21h45'], $this->heuresDePassage());
+        $this->client->request('GET', $url);
+        self::assertInputValueSame('passage1', '21:45');
+
+        // Décoché : plus aucun passage
+        $form = $this->client->getCrawler()->selectButton('Enregistrer')->form();
+        $form['habillage']->untick();
+        $this->client->submit($form);
+        self::assertSame([], $this->heuresDePassage());
+    }
+
+    public function testHabillageFollowsTheShowAndCanPassMidnight(): void
+    {
+        $seance = new Evenement('a', new \DateTimeImmutable('2030-06-15T20:00:00+01:00'));
+        $seance->setFin(new \DateTimeImmutable('2030-06-15T22:00:00+01:00'));
+        $direct = new Direct(new \DateTimeImmutable('2030-06-15T19:30:00+01:00'), new \DateTimeImmutable('2030-06-16T01:00:00+01:00'));
+        $direct->evenement = $seance;
+        $heures = static fn (Direct $d): array => array_map(fn ($p) => $p->format('d H:i'), $d->passagesHabillage());
+
+        self::assertSame(['15 20:30', '15 21:00', '15 21:30'], $heures($direct));
+        $direct->habillageHeures = '00:15,20:45,23:00';
+        self::assertSame(['15 20:45', '15 23:00', '16 00:15'], $heures($direct));
+    }
+
+    public function testThePlayerReceivesTheHabillage(): void
+    {
+        $now = new \DateTimeImmutable();
+        $direct = new Direct($now->modify('-1 hour'), $now->modify('+3 hours'));
+        $direct->tickafricaEventId = self::EVENT_DIRECT;
+        $direct->youtube = 'abcdefghijk';
+        $this->em->persist($direct);
+        $this->em->flush();
+        $this->saisirCode('D1xxxx');
+        $csrf = $this->client->getCrawler()->filter('[data-controller="live-player"]')->attr('data-live-player-csrf-value');
+        self::assertSelectorExists('.live__habillage');
+
+        foreach (['/live/flux', '/live/ping'] as $url) {
+            $this->client->request('POST', $url, server: ['HTTP_X_CSRF_TOKEN' => $csrf]);
+            self::assertResponseIsSuccessful();
+            $donnees = json_decode((string) $this->client->getResponse()->getContent(), true);
+            self::assertCount(3, $donnees['habillage']);
+            self::assertNull($donnees['lancement'], 'direct YouTube : pas de calage');
+            self::assertSame(30_000, $donnees['habillage'][0][1] - $donnees['habillage'][0][0]);
+            self::assertEqualsWithDelta(time() * 1000, $donnees['maintenant'], 5000);
+        }
+    }
+
+    public function testARecordedVideoIsBroadcastFromItsLaunchTime(): void
+    {
+        $this->connexion();
+        $this->ajouterDirect('2030-06-15T19:00', '2030-06-15T23:00');
+        $url = '/admin/directs/'.$this->direct()->getId();
+
+        $this->client->request('GET', $url);
+        $form = $this->client->getCrawler()->selectButton('Enregistrer')->form(['youtube' => 'https://www.youtube.com/watch?v=abcdefghijk', 'lancement' => '23:30']);
+        $form['enregistree']->tick();
+        $this->client->submit($form);
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('.adm-alert--error', 'lancement');
+
+        // Un passage avant le lancement ne serait vu de personne
+        $this->client->submitForm('Enregistrer', ['lancement' => '20:00', 'passage1' => '19:30', 'passage2' => '21:00', 'passage3' => '22:00']);
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('.adm-alert--error', 'Habillage');
+
+        $this->client->submitForm('Enregistrer', ['passage1' => '', 'passage2' => '', 'passage3' => '']);
+        self::assertResponseRedirects('/admin/directs');
+        self::assertSame(['20h45', '21h30', '22h15'], $this->heuresDePassage());
+        self::assertSame('20:00', $this->direct()->lancement()->format('H:i'));
+    }
+
+    public function testTicketsWaitForTheLaunchOfARecordedVideo(): void
+    {
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('Africa/Porto-Novo'));
+        $direct = new Direct($now->modify('-1 hour'), $now->modify('+3 hours'));
+        $direct->tickafricaEventId = self::EVENT_DIRECT;
+        $direct->youtube = 'abcdefghijk';
+        $direct->enregistree = true;
+        $direct->lancementHeure = $now->modify('+30 minutes')->format('H:i');
+        $this->em->persist($direct);
+        $this->em->flush();
+
+        // La fenêtre est ouverte, mais la vidéo n'est pas encore lancée
+        $this->saisirCode('D1xxxx');
+        self::assertSelectorExists('[data-controller="reload-at"]');
+        self::assertSelectorNotExists('[data-controller="live-player"]');
+
+        $direct = $this->em->find(Direct::class, $direct->getId());
+        $direct->lancementHeure = $now->modify('-10 minutes')->format('H:i');
+        $this->em->flush();
+        $crawler = $this->client->request('GET', '/live');
+        $csrf = $crawler->filter('[data-controller="live-player"]')->attr('data-live-player-csrf-value');
+        self::assertSelectorTextContains('.live__note', 'la même pour tout le monde');
+
+        $this->client->request('POST', '/live/flux', server: ['HTTP_X_CSRF_TOKEN' => $csrf]);
+        $donnees = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertSame('abcdefghijk', $donnees['videoId']);
+        self::assertEqualsWithDelta(600, ($donnees['maintenant'] - $donnees['lancement']) / 1000, 65);
+    }
+
     private function ajouterLieuEtEvenement(): void
     {
         $e = new Evenement('a', new \DateTimeImmutable('2030-06-15T20:00:00+01:00'));
@@ -386,6 +509,14 @@ final class AdminProgrammeTest extends WebTestCase
         ('image'.$type)(imagecreatetruecolor($l, $h), $fichier);
 
         return new UploadedFile($fichier, 'photo.'.$type, null, null, true);
+    }
+
+    /** @return list<string> */
+    private function heuresDePassage(): array
+    {
+        $this->em->clear();
+
+        return array_map(fn ($p) => $p->format('H\hi'), $this->direct()->passagesHabillage());
     }
 
     private function lieu(): ?Lieu

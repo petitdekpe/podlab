@@ -23,7 +23,10 @@ final class AdminDirectController extends AbstractController
 {
     use AdminPageTrait;
 
-    private const CASES = ['accesOuvert', 'filigrane', 'publie'];
+    private const CASES = ['accesOuvert', 'filigrane', 'publie', 'habillage', 'enregistree'];
+    /** Champs des heures de passage de l'habillage */
+    private const HEURES = ['passage1', 'passage2', 'passage3'];
+    private const HEURE = '/^([01]\d|2[0-3]):[0-5]\d$/D';
 
     public function __construct(
         private readonly Programme $programme,
@@ -122,6 +125,8 @@ final class AdminDirectController extends AbstractController
         $form = [
             'titre' => $direct->titre,
             'youtube' => $direct->youtube,
+            'enregistree' => $direct->enregistree,
+            'lancement' => $direct->lancementHeure,
             'ouverture' => $direct->ouverture()->format('Y-m-d\TH:i'),
             'fin' => $direct->fin()->format('Y-m-d\TH:i'),
             'evenement' => (string) $direct->evenement?->getId(),
@@ -130,10 +135,12 @@ final class AdminDirectController extends AbstractController
             'accesOuvert' => $direct->accesOuvert,
             'filigrane' => $direct->filigrane,
             'publie' => $direct->publie,
-        ];
+            'habillage' => $direct->habillage,
+            'duree' => (string) $direct->habillageDuree,
+        ] + array_combine(self::HEURES, array_pad(explode(',', $direct->habillageHeures), Direct::PASSAGES, ''));
 
         if ($request->isMethod('POST')) {
-            foreach (['titre', 'youtube', 'ouverture', 'fin', 'evenement', 'event', 'billetterie'] as $champ) {
+            foreach (['titre', 'youtube', 'ouverture', 'fin', 'evenement', 'event', 'billetterie', 'lancement', 'duree', ...self::HEURES] as $champ) {
                 $form[$champ] = self::texte($request, $champ);
             }
             foreach (self::CASES as $champ) {
@@ -145,10 +152,13 @@ final class AdminDirectController extends AbstractController
                 $nouveau = null === $direct->getId();
                 $direct->titre = $form['titre'] ?: LiveSettings::DEFAULT_TITLE;
                 $direct->youtube = LiveSettings::extractVideoId($form['youtube']);
+                $direct->lancementHeure = $form['enregistree'] ? $form['lancement'] : '';
                 $direct->setFenetre(DateFr::saisie($form['ouverture']), DateFr::saisie($form['fin']));
                 $direct->evenement = $this->em->find(Evenement::class, (int) $form['evenement']);
                 $direct->tickafricaEventId = LiveSettings::normalizeUuid($form['event']);
                 $direct->billetterieUrl = $form['billetterie'];
+                $direct->habillageHeures = implode(',', self::heures($form));
+                $direct->habillageDuree = (int) $form['duree'];
                 foreach (self::CASES as $champ) {
                     $direct->$champ = $form[$champ];
                 }
@@ -193,6 +203,11 @@ final class AdminDirectController extends AbstractController
             $erreurs[] = 'Cette séance n\'existe plus : choisissez-en une autre.';
         }
 
+        $duree = filter_var($form['duree'], \FILTER_VALIDATE_INT, ['options' => ['min_range' => 10, 'max_range' => 300]]);
+        if (false === $duree) {
+            $erreurs[] = 'La durée d\'un passage de l\'habillage doit être comprise entre 10 et 300 secondes.';
+        }
+
         $ouverture = DateFr::saisie($form['ouverture']);
         $fin = DateFr::saisie($form['fin']);
         if (null === $ouverture || null === $fin) {
@@ -203,7 +218,51 @@ final class AdminDirectController extends AbstractController
             $erreurs[] = $conflit;
         }
 
+        $fenetreValide = null !== $ouverture && null !== $fin && $fin > $ouverture;
+        // Heure à partir de laquelle les billets voient la vidéo
+        $depart = $ouverture;
+        if ($form['enregistree'] && '' !== $form['lancement']) {
+            if (!preg_match(self::HEURE, $form['lancement'])) {
+                $erreurs[] = 'L\'heure de lancement de la vidéo n\'est pas valide.';
+            } elseif ($fenetreValide) {
+                $depart = (new Direct($ouverture, $fin))->aLHeure($form['lancement']);
+                if ($depart >= $fin) {
+                    $erreurs[] = 'Le lancement de la vidéo doit tomber entre l\'ouverture et la fin du direct.';
+                }
+            }
+        }
+
+        $heures = self::heures($form);
+        if ([] === $heures) {
+            return $erreurs;
+        }
+        if (Direct::PASSAGES !== \count(preg_grep(self::HEURE, $heures))) {
+            $erreurs[] = 'Habillage : saisissez les trois heures de passage, ou laissez les trois vides.';
+        } elseif (false !== $duree && $fenetreValide) {
+            $essai = new Direct($ouverture, $fin);
+            $passages = array_map($essai->aLHeure(...), $heures);
+            sort($passages);
+            if ($passages[0] < $depart || end($passages) >= $fin) {
+                $erreurs[] = 'Habillage : chaque passage doit tomber entre l\'ouverture (ou le lancement de la vidéo) et la fin du direct.';
+            } elseif ($passages[1]->getTimestamp() - $passages[0]->getTimestamp() < $duree
+                || $passages[2]->getTimestamp() - $passages[1]->getTimestamp() < $duree) {
+                $erreurs[] = 'Habillage : deux passages se chevauchent, espacez-les.';
+            }
+        }
+
         return $erreurs;
+    }
+
+    /**
+     * @param array<string, string|bool> $form
+     *
+     * @return list<string> les trois champs, ou [] s'ils sont tous vides
+     */
+    private static function heures(array $form): array
+    {
+        $heures = array_map(fn (string $champ): string => $form[$champ], self::HEURES);
+
+        return '' === implode('', $heures) ? [] : $heures;
     }
 
     /** La page /live ne présente qu'un direct à la fois : deux directs publiés ne se chevauchent pas. */

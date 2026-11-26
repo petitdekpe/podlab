@@ -88,10 +88,30 @@
                  data-live-player-csrf-value="{{ csrf_token('live') }}"
                  data-live-player-ends-at-value="{{ ends_at|date('c') }}">
                 <div class="live__stage" data-live-player-target="stage">
-                    <div class="live__frame" data-live-player-target="frame"></div>
-                    {# Calque qui bloque tout clic sur la vidéo : pas de pause, de retour ni de lien YouTube #}
-                    <div class="live__shield" data-live-player-target="shield"></div>
-                    {% if watermark %}<p class="live__watermark" data-live-player-target="watermark" aria-hidden="true">{{ watermark }}</p>{% endif %}
+                    {# Image 16:9 : l'habillage publicitaire derrière, la vidéo devant, réduite pendant un passage #}
+                    <div class="live__canvas">
+                        <img class="live__habillage" src="{{ asset('images/habillage-tickafrica.webp') }}" width="1920" height="1080"
+                             alt="Publicité Tick Africa : votre billetterie en ligne sur tick.africa">
+                        <div class="live__video">
+                            <div class="live__frame" data-live-player-target="frame"></div>
+                            {# Calque qui bloque tout clic sur la vidéo : pas de pause, de retour ni de lien YouTube #}
+                            <div class="live__shield" data-live-player-target="shield"></div>
+                            {% if watermark %}<p class="live__watermark" data-live-player-target="watermark" aria-hidden="true">{{ watermark }}</p>{% endif %}
+                        </div>
+
+                        <div class="live__bar" data-live-player-target="bar" hidden>
+                            <span class="live__badge"><span class="live__dot" aria-hidden="true"></span>EN DIRECT</span>
+                            <div class="live__bar-right">
+                                <button type="button" class="live__icon" data-live-player-target="muteBtn" data-action="live-player#toggleMute" aria-label="Couper le son">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path data-live-player-target="waves" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+                                </button>
+                                <input type="range" min="0" max="100" value="100" class="live__volume" data-live-player-target="volume" data-action="input->live-player#setVolume" aria-label="Volume">
+                                <button type="button" class="live__icon" data-live-player-target="fsBtn" data-action="live-player#toggleFullscreen" aria-label="Plein écran">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="live__gate" data-live-player-target="gate">
                         <p class="live__gate-text" data-live-player-target="status">Chargement du direct…</p>
@@ -101,19 +121,6 @@
                     <div class="live__hint" data-live-player-target="hint" hidden>
                         <span>En attente du début du direct…</span>
                         <button type="button" class="live__hint-btn" data-action="live-player#retry">Relancer</button>
-                    </div>
-
-                    <div class="live__bar" data-live-player-target="bar" hidden>
-                        <span class="live__badge"><span class="live__dot" aria-hidden="true"></span>EN DIRECT</span>
-                        <div class="live__bar-right">
-                            <button type="button" class="live__icon" data-live-player-target="muteBtn" data-action="live-player#toggleMute" aria-label="Couper le son">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path data-live-player-target="waves" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
-                            </button>
-                            <input type="range" min="0" max="100" value="100" class="live__volume" data-live-player-target="volume" data-action="input->live-player#setVolume" aria-label="Volume">
-                            <button type="button" class="live__icon" data-live-player-target="fsBtn" data-action="live-player#toggleFullscreen" aria-label="Plein écran">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-                            </button>
-                        </div>
                     </div>
 
                     {# Panneaux affichés à la place de la vidéo #}
@@ -131,7 +138,7 @@
                     </div>
                 </div>
 
-                <p class="live__note">C'est du direct&nbsp;: si vous arrivez en cours de route, vous rejoignez là où nous en sommes. Il n'est pas possible de mettre en pause ni de revenir en arrière, et une fois le direct terminé, c'est fini. Votre code ne fonctionne que sur cet appareil.</p>
+                <p class="live__note">{{ enregistree ? 'La diffusion est la même pour tout le monde' : 'C\'est du direct' }}&nbsp;: si vous arrivez en cours de route, vous rejoignez là où nous en sommes. Il n'est pas possible de mettre en pause ni de revenir en arrière, et une fois le direct terminé, c'est fini. Votre code ne fonctionne que sur cet appareil.</p>
                 <p class="live__legal"><strong>Toute capture d'écran, tout enregistrement ou toute diffusion du direct est strictement interdit</strong> et expose à des poursuites judiciaires.</p>
             </div>
 

@@ -17,6 +17,10 @@ class Direct
     public const EN_COURS = 'en_cours';
     public const TERMINE = 'termine';
 
+    /** Habillage publicitaire en L : nombre de passages par direct, et durée par défaut en secondes */
+    public const PASSAGES = 3;
+    public const HABILLAGE_DUREE = 30;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -28,6 +32,14 @@ class Direct
     /** Identifiant de la vidéo, ou '' : jamais dans le HTML public */
     #[ORM\Column(length: 11)]
     public string $youtube = '';
+
+    /** Vidéo déjà enregistrée (et non un direct YouTube), diffusée comme un direct à partir de lancement() */
+    #[ORM\Column(options: ['default' => false])]
+    public bool $enregistree = false;
+
+    /** « 20:00 » (heure du Bénin), ou '' : début de la séance, à défaut ouverture */
+    #[ORM\Column(length: 5, options: ['default' => ''])]
+    public string $lancementHeure = '';
 
     /** Heure du Bénin, sans fuseau : lue par ouverture() */
     #[ORM\Column]
@@ -58,6 +70,17 @@ class Direct
 
     #[ORM\Column]
     public bool $publie = true;
+
+    #[ORM\Column(options: ['default' => true])]
+    public bool $habillage = true;
+
+    /** « 13:20,14:00,14:40 » (heure du Bénin), ou '' : passages répartis automatiquement */
+    #[ORM\Column(length: 17, options: ['default' => ''])]
+    public string $habillageHeures = '';
+
+    /** Durée d'un passage, en secondes */
+    #[ORM\Column(options: ['default' => self::HABILLAGE_DUREE])]
+    public int $habillageDuree = self::HABILLAGE_DUREE;
 
     public function __construct(\DateTimeImmutable $ouverture, \DateTimeImmutable $fin)
     {
@@ -96,9 +119,71 @@ class Direct
         };
     }
 
+    /** Vidéo enregistrée : instant où elle démarre pour tout le monde ; null pour un direct YouTube. */
+    public function lancement(): ?\DateTimeImmutable
+    {
+        if (!$this->enregistree) {
+            return null;
+        }
+        if ('' !== $this->lancementHeure) {
+            return $this->aLHeure($this->lancementHeure);
+        }
+        $seance = $this->evenement?->debut();
+
+        return null !== $seance && $seance >= $this->ouverture() && $seance < $this->fin() ? $seance : $this->ouverture();
+    }
+
+    /** Instant à partir duquel les billets voient la vidéo. */
+    public function debutDiffusion(): \DateTimeImmutable
+    {
+        return $this->lancement() ?? $this->ouverture();
+    }
+
     public function chevauche(self $autre): bool
     {
         return $this->ouverture() < $autre->fin() && $autre->ouverture() < $this->fin();
+    }
+
+    /**
+     * Début de chaque passage de l'habillage, dans l'ordre. Sans heures saisies, ils sont
+     * répartis à 25, 50 et 75 % de la séance (à défaut, de la fenêtre du direct).
+     *
+     * @return list<\DateTimeImmutable>
+     */
+    public function passagesHabillage(): array
+    {
+        if (!$this->habillage) {
+            return [];
+        }
+
+        if ('' !== $this->habillageHeures) {
+            $passages = array_map($this->aLHeure(...), explode(',', $this->habillageHeures));
+            sort($passages);
+
+            return $passages;
+        }
+
+        // La fenêtre ouvre avant le spectacle et ferme après : on vise la séance elle-même
+        $debut = $this->lancement() ?? max($this->ouverture(), $this->evenement?->debut() ?? $this->ouverture());
+        $fin = min($this->fin(), $this->evenement?->fin() ?? $this->fin());
+        if ($debut >= $fin) {
+            [$debut, $fin] = [$this->debutDiffusion(), $this->fin()];
+        }
+        $ecart = ($fin->getTimestamp() - $debut->getTimestamp()) / (self::PASSAGES + 1);
+
+        return array_map(
+            fn (int $n): \DateTimeImmutable => $debut->modify(sprintf('+%d seconds', (int) ($n * $ecart))),
+            range(1, self::PASSAGES),
+        );
+    }
+
+    /** Première fois que cette heure (« 13:20 ») se présente à partir de l'ouverture : un direct peut passer minuit. */
+    public function aLHeure(string $heure): \DateTimeImmutable
+    {
+        [$h, $m] = array_map(intval(...), explode(':', $heure));
+        $moment = $this->ouverture()->setTime($h, $m);
+
+        return $moment < $this->ouverture() ? $moment->modify('+1 day') : $moment;
     }
 
     /** Début annoncé au public : celui de la séance, sinon l'ouverture du direct. */
