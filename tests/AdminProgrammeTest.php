@@ -370,51 +370,47 @@ final class AdminProgrammeTest extends WebTestCase
         self::assertSelectorNotExists('.venues__lead');
     }
 
-    public function testHabillageTimesAreChosenAndSentToThePlayer(): void
+    public function testHabillageIsAutomatic(): void
     {
         $this->connexion();
         $this->ajouterDirect('2030-06-15T19:00', '2030-06-15T23:00');
         $url = '/admin/directs/'.$this->direct()->getId();
         self::assertSame(['20h00', '21h00', '22h00'], $this->heuresDePassage());
 
-        // Les trois heures ou aucune, dans la fenêtre, sans chevauchement
-        foreach ([
-            'trois heures' => ['passage1' => '20:10'],
-            'entre l\'ouverture' => ['passage1' => '20:10', 'passage2' => '21:10', 'passage3' => '23:30'],
-            'chevauchent' => ['passage1' => '20:10', 'passage2' => '20:10', 'passage3' => '22:10'],
-            'entre 10 et 300' => ['duree' => '5'],
-        ] as $message => $champs) {
-            $this->client->request('GET', $url);
-            $this->client->submitForm('Enregistrer', $champs);
-            self::assertResponseStatusCodeSame(422);
-            self::assertSelectorTextContains('.adm-alert--error', $message);
-        }
+        // Aucune heure à saisir
+        $this->client->request('GET', $url);
+        self::assertSelectorNotExists('input[type="time"][name^="passage"]');
+        $this->client->submitForm('Enregistrer', ['duree' => '5']);
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('.adm-alert--error', 'entre 10 et 300');
 
+        // La fin change : les passages suivent
         $this->client->request('GET', $url);
-        $this->client->submitForm('Enregistrer', ['passage1' => '21:45', 'passage2' => '19:20', 'passage3' => '20:30', 'duree' => '45']);
+        $this->client->submitForm('Enregistrer', ['fin' => '2030-06-15T21:00', 'duree' => '45']);
         self::assertResponseRedirects('/admin/directs');
-        self::assertSame(['19h20', '20h30', '21h45'], $this->heuresDePassage());
-        $this->client->request('GET', $url);
-        self::assertInputValueSame('passage1', '21:45');
+        self::assertSame(['19h30', '20h00', '20h30'], $this->heuresDePassage());
 
         // Décoché : plus aucun passage
+        $this->client->request('GET', $url);
         $form = $this->client->getCrawler()->selectButton('Enregistrer')->form();
         $form['habillage']->untick();
         $this->client->submit($form);
         self::assertSame([], $this->heuresDePassage());
     }
 
-    public function testHabillageFollowsTheShowAndCanPassMidnight(): void
+    public function testHabillageFollowsTheShow(): void
     {
         $seance = new Evenement('a', new \DateTimeImmutable('2030-06-15T20:00:00+01:00'));
         $seance->setFin(new \DateTimeImmutable('2030-06-15T22:00:00+01:00'));
         $direct = new Direct(new \DateTimeImmutable('2030-06-15T19:30:00+01:00'), new \DateTimeImmutable('2030-06-16T01:00:00+01:00'));
         $direct->evenement = $seance;
-        $heures = static fn (Direct $d): array => array_map(fn ($p) => $p->format('d H:i'), $d->passagesHabillage());
 
-        self::assertSame(['15 20:30', '15 21:00', '15 21:30'], $heures($direct));
-        $direct->habillageHeures = '00:15,20:45,23:00';
-        self::assertSame(['15 20:45', '15 23:00', '16 00:15'], $heures($direct));
+        self::assertSame(['20:30', '21:00', '21:30'], array_map(fn ($p) => $p->format('H:i'), $direct->passagesHabillage()));
+
+        // Une vidéo peut être lancée après minuit
+        $direct->enregistree = true;
+        $direct->lancementHeure = '00:15';
+        self::assertSame('16 00:15', $direct->lancement()->format('d H:i'));
     }
 
     public function testThePlayerReceivesTheHabillage(): void
@@ -434,6 +430,7 @@ final class AdminProgrammeTest extends WebTestCase
             self::assertResponseIsSuccessful();
             $donnees = json_decode((string) $this->client->getResponse()->getContent(), true);
             self::assertCount(3, $donnees['habillage']);
+            self::assertSame(30_000, $donnees['passage']);
             self::assertNull($donnees['lancement'], 'direct YouTube : pas de calage');
             self::assertSame(30_000, $donnees['habillage'][0][1] - $donnees['habillage'][0][0]);
             self::assertEqualsWithDelta(time() * 1000, $donnees['maintenant'], 5000);
@@ -453,15 +450,11 @@ final class AdminProgrammeTest extends WebTestCase
         self::assertResponseStatusCodeSame(422);
         self::assertSelectorTextContains('.adm-alert--error', 'lancement');
 
-        // Un passage avant le lancement ne serait vu de personne
-        $this->client->submitForm('Enregistrer', ['lancement' => '20:00', 'passage1' => '19:30', 'passage2' => '21:00', 'passage3' => '22:00']);
-        self::assertResponseStatusCodeSame(422);
-        self::assertSelectorTextContains('.adm-alert--error', 'Habillage');
-
-        $this->client->submitForm('Enregistrer', ['passage1' => '', 'passage2' => '', 'passage3' => '']);
+        $this->client->submitForm('Enregistrer', ['lancement' => '20:00']);
         self::assertResponseRedirects('/admin/directs');
-        self::assertSame(['20h45', '21h30', '22h15'], $this->heuresDePassage());
         self::assertSame('20:00', $this->direct()->lancement()->format('H:i'));
+        // La durée de la vidéo n'est connue que du lecteur : il place les passages
+        self::assertSame([], $this->heuresDePassage());
     }
 
     public function testTicketsWaitForTheLaunchOfARecordedVideo(): void
@@ -491,6 +484,7 @@ final class AdminProgrammeTest extends WebTestCase
         $donnees = json_decode((string) $this->client->getResponse()->getContent(), true);
         self::assertSame('abcdefghijk', $donnees['videoId']);
         self::assertEqualsWithDelta(600, ($donnees['maintenant'] - $donnees['lancement']) / 1000, 65);
+        self::assertSame([[], 30_000], [$donnees['habillage'], $donnees['passage']]);
     }
 
     private function ajouterLieuEtEvenement(): void

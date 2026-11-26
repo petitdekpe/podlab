@@ -74,10 +74,6 @@ class Direct
     #[ORM\Column(options: ['default' => true])]
     public bool $habillage = true;
 
-    /** « 13:20,14:00,14:40 » (heure du Bénin), ou '' : passages répartis automatiquement */
-    #[ORM\Column(length: 17, options: ['default' => ''])]
-    public string $habillageHeures = '';
-
     /** Durée d'un passage, en secondes */
     #[ORM\Column(options: ['default' => self::HABILLAGE_DUREE])]
     public int $habillageDuree = self::HABILLAGE_DUREE;
@@ -145,29 +141,23 @@ class Direct
     }
 
     /**
-     * Début de chaque passage de l'habillage, dans l'ordre. Sans heures saisies, ils sont
-     * répartis à 25, 50 et 75 % de la séance (à défaut, de la fenêtre du direct).
+     * Début de chaque passage de l'habillage pour un direct YouTube : à 25, 50 et 75 %
+     * de la séance (à défaut, de la fenêtre du direct). Pour une vidéo enregistrée, la
+     * liste est vide : seul le lecteur connaît sa durée, il calcule les passages.
      *
      * @return list<\DateTimeImmutable>
      */
     public function passagesHabillage(): array
     {
-        if (!$this->habillage) {
+        if (!$this->habillage || $this->enregistree) {
             return [];
         }
 
-        if ('' !== $this->habillageHeures) {
-            $passages = array_map($this->aLHeure(...), explode(',', $this->habillageHeures));
-            sort($passages);
-
-            return $passages;
-        }
-
         // La fenêtre ouvre avant le spectacle et ferme après : on vise la séance elle-même
-        $debut = $this->lancement() ?? max($this->ouverture(), $this->evenement?->debut() ?? $this->ouverture());
+        $debut = max($this->ouverture(), $this->evenement?->debut() ?? $this->ouverture());
         $fin = min($this->fin(), $this->evenement?->fin() ?? $this->fin());
         if ($debut >= $fin) {
-            [$debut, $fin] = [$this->debutDiffusion(), $this->fin()];
+            [$debut, $fin] = [$this->ouverture(), $this->fin()];
         }
         $ecart = ($fin->getTimestamp() - $debut->getTimestamp()) / (self::PASSAGES + 1);
 

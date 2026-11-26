@@ -224,9 +224,10 @@ final class LiveController extends AbstractController
     /**
      * Passages de l'habillage et lancement d'une vidéo enregistrée (null pour un direct),
      * en millisecondes, avec l'heure du serveur : le lecteur ne se fie pas à l'horloge
-     * de l'appareil.
+     * de l'appareil. Pour une vidéo enregistrée, il reçoit seulement la durée d'un
+     * passage (0 : pas d'habillage) et les place selon la durée de la vidéo.
      *
-     * @return array{maintenant: int, lancement: ?int, habillage: list<array{int, int}>}
+     * @return array{maintenant: int, lancement: ?int, passage: int, habillage: list<array{int, int}>}
      */
     private function deroule(?Direct $direct): array
     {
@@ -235,6 +236,7 @@ final class LiveController extends AbstractController
         return [
             'maintenant' => (int) (microtime(true) * 1000),
             'lancement' => null === $lancement ? null : $lancement->getTimestamp() * 1000,
+            'passage' => $direct?->habillage ? $direct->habillageDuree * 1000 : 0,
             'habillage' => array_map(
                 fn (\DateTimeImmutable $debut): array => [$debut->getTimestamp() * 1000, ($debut->getTimestamp() + $direct->habillageDuree) * 1000],
                 $direct?->passagesHabillage() ?? [],

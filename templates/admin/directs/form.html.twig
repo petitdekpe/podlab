@@ -75,22 +75,14 @@
         <h2 class="adm-h2 adm-h2--section">Habillage publicitaire (Tick Africa)</h2>
         <label class="adm-check">
             <input type="checkbox" name="habillage" value="1"{{ form.habillage ? ' checked' }}>
-            <span><strong>Afficher l'habillage en L, 3 fois pendant le direct</strong><br><span class="adm-muted">La vidéo se réduit en haut à droite le temps du passage, sans coupure ni perte du son.</span></span>
+            <span><strong>Afficher l'habillage en L, 3 fois pendant la diffusion</strong><br><span class="adm-muted">La vidéo se réduit en haut à droite le temps du passage, sans coupure ni perte du son.</span></span>
         </label>
-        <div class="adm-row">
-            {% for n in 1..3 %}
-                <div>
-                    <label class="adm-label" for="passage{{ n }}">Passage {{ n }}</label>
-                    <input id="passage{{ n }}" name="passage{{ n }}" type="time" class="adm-input" value="{{ attribute(form, 'passage' ~ n) }}">
-                </div>
-            {% endfor %}
-        </div>
         <p class="adm-help">
-            Heure du Bénin. Laissez les trois champs vides pour une répartition automatique sur la séance.
-            Vous pouvez les modifier pendant le direct (retard du spectacle…)&nbsp;: les spectateurs connectés suivent en 20 secondes environ, sans recharger la page.
-            YouTube diffuse avec un décalage&nbsp;: prévoyez une marge autour des moments importants.
+            Les moments sont automatiques&nbsp;: au quart, à la moitié et aux trois quarts de la diffusion.
+            Pour une vidéo enregistrée, c'est la durée de la vidéo à partir de son lancement.
+            Pour un direct, c'est la durée de la séance (sans séance, de l'ouverture à la fin).
             {% if direct.id and direct.passagesHabillage %}
-                <br><strong>Passages enregistrés&nbsp;: {{ direct.passagesHabillage|map(p => p|date('H\\hi', 'Africa/Porto-Novo'))|join(', ') }}.</strong>
+                <br><strong>Passages prévus&nbsp;: {{ direct.passagesHabillage|map(p => p|date('H\\hi', 'Africa/Porto-Novo'))|join(', ') }}.</strong>
             {% endif %}
         </p>
 
